@@ -44,6 +44,7 @@ O desenvolvimento é conduzido por agentes especializados:
 - **Webmaster** — Cria e atualiza o site principal (lobby) com cards de cada jogo
 - **Especialista UX** — Valida interface e usabilidade
 - **Jogador Profissional** — Testa gameplay e encontra bugs
+- **DevOps** — Commits, versionamento e publicação via Git
 
 ## Fluxo de Trabalho
 ```

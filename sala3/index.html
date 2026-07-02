@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 3 — A Mansão dos Blackwood</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #050508;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      gap: 12px;
+    }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #3d2b1f; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/events.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/gothic.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+
+  <script>
+    UITokens.apply(ThemeGothic);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#050508' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'salao', flags: {
+      retratoFamilia: false, retratoFilha: false, cofreSalao: false, cofreAberto: false,
+      relogio: false, poltrona: false, chaveColetada: false, lustre: false, lareira: false,
+      estante: false, grimorio: false, escrivaninha: false, diario: false, globo: false,
+      espelho: false, candelabro: false, passagemPorao: false,
+      gravuras: false, velas: false, amuleto: false, pedestal: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+
+    UITabs.create('tabs', [
+      { id: 'salao', label: 'Salão', locked: false },
+      { id: 'biblioteca', label: 'Biblioteca', locked: true },
+      { id: 'porao', label: 'Porão', locked: true }
+    ], (tabId) => {
+      if (tabId === 'biblioteca' && !state.get('chaveColetada')) { msg('A porta da biblioteca está trancada.'); UITabs.setActive('tabs', 'salao'); return; }
+      if (tabId === 'porao' && !state.get('passagemPorao')) { msg('Ainda não há caminho para o porão.'); UITabs.setActive('tabs', 'biblioteca'); return; }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmb(tabId); });
+    });
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
+
+    const dust = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(200,180,150,0.15)', count: 30, speedX: [-2,2], speedY: [-4,-1], size: [1,2], life: [5,12] });
+
+    function msg(t) { UIMessageBox.show('message', t); }
+    function msgAmb(a) {
+      if (a === 'salao') msg('O grande salão. Retratos te observam. A lareira crepita.');
+      else if (a === 'biblioteca') msg('A biblioteca. Estantes enormes, cheiro de papel velho. Velas lançam sombras dançantes.');
+      else msg('O porão. Um círculo ritualístico no chão. Velas acendem sozinhas ao você entrar...');
+    }
+    msg('A porta da mansão Blackwood selou-se com símbolos arcanos. O ar está gelado. Você precisa encontrar a saída.');
+    timer.start();
+
+    // OBJETOS
+    const objetosSalao = [
+      { id: 'retratoFamilia', x: 200, y: 40, w: 120, h: 150, label: 'Retrato da família' },
+      { id: 'retratoFilha', x: 600, y: 40, w: 100, h: 140, label: 'Retrato da filha' },
+      { id: 'lareira', x: 50, y: 350, w: 180, h: 160, label: 'Lareira' },
+      { id: 'relogio', x: 420, y: 30, w: 70, h: 120, label: 'Relógio de avô' },
+      { id: 'poltrona', x: 350, y: 400, w: 130, h: 100, label: 'Poltrona' },
+      { id: 'lustre', x: 400, y: 0, w: 100, h: 50, label: 'Lustre' },
+      { id: 'cofreSalao', x: 620, y: 200, w: 90, h: 80, label: 'Cofre (atrás do retrato)' },
+      { id: 'portaBiblioteca', x: 780, y: 250, w: 70, h: 180, label: 'Porta → Biblioteca' },
+    ];
+    const objetosBiblioteca = [
+      { id: 'estante', x: 30, y: 30, w: 200, h: 400, label: 'Estantes' },
+      { id: 'grimorio', x: 50, y: 180, w: 40, h: 55, label: 'Livro vermelho (Grimório)' },
+      { id: 'escrivaninha', x: 350, y: 300, w: 180, h: 120, label: 'Escrivaninha' },
+      { id: 'diario', x: 380, y: 310, w: 60, h: 40, label: 'Diário' },
+      { id: 'globo', x: 600, y: 150, w: 80, h: 80, label: 'Globo terrestre' },
+      { id: 'espelho', x: 700, y: 60, w: 70, h: 120, label: 'Espelho' },
+      { id: 'candelabro', x: 550, y: 350, w: 60, h: 90, label: 'Candelabro' },
+      { id: 'portaPorao', x: 780, y: 400, w: 80, h: 140, label: 'Passagem → Porão' },
+      { id: 'voltarSalao', x: 30, y: 520, w: 120, h: 50, label: '← Salão' },
+    ];
+    const objetosPorao = [
+      { id: 'altar', x: 300, y: 150, w: 300, h: 250, label: 'Altar ritual' },
+      { id: 'gravuras', x: 50, y: 80, w: 150, h: 200, label: 'Gravuras na parede' },
+      { id: 'velas', x: 700, y: 200, w: 100, h: 100, label: 'Velas dispostas' },
+      { id: 'pedestal', x: 100, y: 400, w: 80, h: 80, label: 'Pedestal com amuleto' },
+      { id: 'portaSelada', x: 750, y: 400, w: 80, h: 150, label: 'Porta selada (saída)' },
+      { id: 'voltarBib', x: 30, y: 520, w: 120, h: 50, label: '← Biblioteca' },
+    ];
+    function getObjetos() {
+      const a = state.getAmbiente();
+      if (a === 'salao') return objetosSalao;
+      if (a === 'biblioteca') return objetosBiblioteca;
+      return objetosPorao;
+    }
+
+    // INTERAÇÕES
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+      // SALÃO
+      if (id === 'retratoFamilia') {
+        if (!state.get('retratoFamilia')) { state.set('retratoFamilia', true); inv.add('pista_familia', '🖼️', 'Família: pai ao Norte, mãe ao Sul, filho a Leste, filha a Oeste'); msg('O retrato mostra a família Blackwood em poses rígidas. Pai no topo, mãe embaixo, filho à direita, filha à esquerda. Uma disposição peculiar...'); }
+        else msg('Pai (topo/Norte), Mãe (baixo/Sul), Filho (direita/Leste), Filha (esquerda/Oeste).');
+      } else if (id === 'retratoFilha') {
+        if (!state.get('retratoFilha')) { state.set('retratoFilha', true); msg('O retrato da filha. Os olhos parecem seguir você... A moldura está solta! Atrás dela: um cofre na parede.'); }
+        else if (!state.get('cofreAberto')) { abrirCofreSalao(); }
+        else msg('Cofre aberto. O cálice já foi retirado.');
+      } else if (id === 'cofreSalao') {
+        if (!state.get('cofreAberto')) abrirCofreSalao();
+        else msg('Cofre vazio.');
+      } else if (id === 'lareira') {
+        if (!state.get('lareira')) { state.set('lareira', true); inv.add('simbolo_norte', '🔥', 'Inscrição lareira: símbolo do Norte = Cálice'); msg('Na pedra da lareira, uma inscrição antiga: o símbolo do Norte é um cálice. "O que protege, vai ao topo."'); }
+        else msg('Símbolo Norte = Cálice. "O que protege, vai ao topo."');
+      } else if (id === 'relogio') {
+        if (!state.get('relogio')) { state.set('relogio', true); inv.add('hora_937', '🕰️', 'Relógio parado: 9:37'); msg('O relógio de avô parou às 9:37. A hora da cerimônia interrompida. Os números 9-3-7 estão gravados fundo.'); }
+        else msg('Parado às 9:37. Hora da cerimônia.');
+      } else if (id === 'poltrona') {
+        if (!state.get('poltrona')) { state.set('poltrona', true); state.set('chaveColetada', true); inv.add('chave_bib', '🗝️', 'Chave da biblioteca'); UITabs.unlock('tabs', 'biblioteca'); msg('Embaixo da poltrona: uma chave antiga com etiqueta "Biblioteca". Porta desbloqueada!'); }
+        else msg('Nada mais sob a poltrona.');
+      } else if (id === 'lustre') {
+        if (!state.get('lustre')) { state.set('lustre', true); msg('O lustre balança levemente. No teto atrás dele, um símbolo arranhado: uma adaga apontando para o Sul.'); inv.add('simbolo_sul', '🗡️', 'Teto: adaga = Sul'); }
+        else msg('Símbolo no teto: adaga = Sul.');
+      } else if (id === 'portaBiblioteca') {
+        if (state.get('chaveColetada')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('biblioteca'); UITabs.setActive('tabs', 'biblioteca'); msgAmb('biblioteca'); }); }
+        else msg('Trancada. Precisa de uma chave.');
+      }
+
+      // BIBLIOTECA
+      else if (id === 'estante') {
+        if (!state.get('estante')) { state.set('estante', true); msg('Estantes do chão ao teto. Livros sobre ocultismo, alquimia, rituais. Um livro vermelho com capa de couro se destaca.'); }
+        else msg('O livro vermelho se destaca entre os outros.');
+      } else if (id === 'grimorio') {
+        if (!state.get('grimorio')) { state.set('grimorio', true); inv.add('grimorio', '📕', 'Grimório dos Blackwood'); msg('Você retira o Grimório dos Blackwood. Capa de couro com símbolo dourado. Um dos artefatos do ritual!'); }
+        else msg('Já pegou o Grimório.');
+      } else if (id === 'escrivaninha') {
+        if (!state.get('escrivaninha')) { state.set('escrivaninha', true); inv.add('adaga', '🗡️', 'Adaga cerimonial'); msg('Na gaveta da escrivaninha: uma adaga cerimonial com cabo de osso. Outro artefato!'); }
+        else msg('Gaveta vazia agora.');
+      } else if (id === 'diario') {
+        if (!state.get('diario')) { state.set('diario', true); inv.add('pista_diario', '📖', 'Diário: N=proteção, S=sacrifício, L=visão, O=conhecimento'); msg('Diário de Eleonora Blackwood: "No ritual, cada ponto cardeal representa: Norte=proteção(cálice), Sul=sacrifício(adaga), Leste=visão(amuleto), Oeste=conhecimento(grimório)."'); }
+        else msg('N=cálice(proteção), S=adaga(sacrifício), L=amuleto(visão), O=grimório(conhecimento).');
+      } else if (id === 'globo') {
+        if (!state.get('globo')) { state.set('globo', true); msg('O globo gira e revela um compartimento secreto vazio. Uma nota: "O candelabro ilumina o caminho oculto."'); }
+        else msg('"O candelabro ilumina o caminho oculto."');
+      } else if (id === 'espelho') {
+        if (!state.get('espelho')) { state.set('espelho', true); msg('O espelho reflete algo que não está na sala: um símbolo circular no chão. O porão está logo abaixo.'); }
+        else msg('O reflexo mostra um círculo no chão... abaixo de você.');
+      } else if (id === 'candelabro') {
+        if (!state.get('candelabro')) {
+          if (state.get('globo') && state.get('espelho')) { state.set('candelabro', true); state.set('passagemPorao', true); UITabs.unlock('tabs', 'porao'); msg('Ao acender o candelabro, a luz revela uma passagem atrás da estante! O porão está acessível!'); }
+          else msg('O candelabro não acende. Parece que algo precisa ser revelado primeiro.');
+        } else msg('Passagem para o porão aberta.');
+      } else if (id === 'portaPorao') {
+        if (state.get('passagemPorao')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('porao'); UITabs.setActive('tabs', 'porao'); msgAmb('porao'); }); }
+        else msg('Nenhuma passagem visível.');
+      } else if (id === 'voltarSalao') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('salao'); UITabs.setActive('tabs', 'salao'); msg('De volta ao salão.'); });
+      }
+
+      // PORÃO
+      else if (id === 'altar') { abrirPainelAltar(); }
+      else if (id === 'gravuras') {
+        if (!state.get('gravuras')) { state.set('gravuras', true); inv.add('pista_gravuras', '🪨', 'Gravuras: N(topo)=cálice, S(base)=lâmina, L(dir)=olho, O(esq)=livro'); msg('Gravuras na parede mostram 4 figuras nos pontos cardeais: topo=cálice, base=lâmina, direita=olho, esquerda=livro.'); }
+        else msg('Gravuras: topo=cálice, base=lâmina, direita=olho, esquerda=livro.');
+      } else if (id === 'velas') {
+        if (!state.get('velas')) { state.set('velas', true); msg('As velas estão dispostas em cruz. Norte brilha mais forte. A cera derretida forma o número 4: são 4 artefatos necessários.'); }
+        else msg('4 velas em cruz. 4 artefatos.');
+      } else if (id === 'pedestal') {
+        if (!state.get('pedestal')) { state.set('pedestal', true); inv.add('amuleto', '🔮', 'Amuleto dos Blackwood'); msg('No pedestal de pedra: um amuleto com olho gravado. O terceiro artefato! "Visão além do véu."'); }
+        else msg('Pedestal vazio. Amuleto coletado.');
+      } else if (id === 'portaSelada') {
+        msg('A porta brilha com símbolos arcanos. O ritual no altar precisa ser completado para quebrar o selo.');
+      } else if (id === 'voltarBib') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('biblioteca'); UITabs.setActive('tabs', 'biblioteca'); msg('De volta à biblioteca.'); });
+      }
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // COFRE DO SALÃO — código 937 (relógio)
+    function abrirCofreSalao() {
+      if (!state.get('retratoFilha')) { msg('Precisa investigar o retrato da filha primeiro.'); return; }
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:14px;">🔐 Cofre antigo — Combinação de 3 números</p>
+        <input type="text" id="codigoInput" maxlength="3" placeholder="_ _ _" style="background:#0d0815; border:1px solid #3d2b1f; color:#d4af37; font-family:monospace; font-size:1.5rem; padding:10px; width:100px; text-align:center; border-radius:4px;">
+        <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
+          <button id="btnTentar" style="padding:8px 20px; background:#1a0a2e; border:1px solid #3d2b1f; color:#d4c8a0; font-family:monospace; cursor:pointer; border-radius:4px;">Abrir</button>
+          <button id="btnVoltar" style="padding:8px 20px; background:#1a0a2e; border:1px solid #3d2b1f; color:#d4c8a0; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('codigoInput').focus();
+        document.getElementById('btnTentar').addEventListener('click', () => {
+          const v = document.getElementById('codigoInput').value.trim();
+          if (v === '937') { state.set('cofreAberto', true); UIPanel.hide('puzzle-panel'); inv.add('calice', '🏆', 'Cálice dos Blackwood'); UIInventory.render('inventory', inv.getAll()); msg('✅ O cofre abre! Dentro: um cálice dourado com inscrições. O quarto artefato!'); }
+          else { msg('❌ Combinação incorreta. Os diais resistem.'); document.getElementById('codigoInput').value = ''; document.getElementById('codigoInput').focus(); }
+        });
+        document.getElementById('btnVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do cofre.'); });
+        document.getElementById('codigoInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('btnTentar').click(); });
+      }, 50);
+    }
+
+    // PUZZLE FINAL: Altar — posicionar 4 artefatos nos pontos cardeais
+    // Correto: N=calice, S=adaga, L=amuleto, O=grimorio
+    function abrirPainelAltar() {
+      const artefatos = ['calice', 'adaga', 'amuleto', 'grimorio'];
+      const temTodos = artefatos.every(a => inv.has(a));
+      if (!temTodos) { msg('O altar exige 4 artefatos nos pontos cardeais. Você ainda não tem todos. (Faltam: ' + artefatos.filter(a => !inv.has(a)).join(', ') + ')'); return; }
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">⚗️ Altar Ritual — Posicione os artefatos nos pontos cardeais</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;">
+          <label style="color:#d4c8a0;">Norte: <select id="selN" style="background:#0d0815; border:1px solid #3d2b1f; color:#d4af37; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option><option value="calice">🏆 Cálice</option><option value="adaga">🗡️ Adaga</option><option value="amuleto">🔮 Amuleto</option><option value="grimorio">📕 Grimório</option></select></label>
+          <label style="color:#d4c8a0;">Sul: <select id="selS" style="background:#0d0815; border:1px solid #3d2b1f; color:#d4af37; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option><option value="calice">🏆 Cálice</option><option value="adaga">🗡️ Adaga</option><option value="amuleto">🔮 Amuleto</option><option value="grimorio">📕 Grimório</option></select></label>
+          <label style="color:#d4c8a0;">Leste: <select id="selL" style="background:#0d0815; border:1px solid #3d2b1f; color:#d4af37; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option><option value="calice">🏆 Cálice</option><option value="adaga">🗡️ Adaga</option><option value="amuleto">🔮 Amuleto</option><option value="grimorio">📕 Grimório</option></select></label>
+          <label style="color:#d4c8a0;">Oeste: <select id="selO" style="background:#0d0815; border:1px solid #3d2b1f; color:#d4af37; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option><option value="calice">🏆 Cálice</option><option value="adaga">🗡️ Adaga</option><option value="amuleto">🔮 Amuleto</option><option value="grimorio">📕 Grimório</option></select></label>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button id="btnRitual" style="padding:8px 20px; background:#1a0a2e; border:1px solid #d4af37; color:#d4af37; font-family:monospace; cursor:pointer; border-radius:4px;">Completar Ritual</button>
+          <button id="btnCancelar" style="padding:8px 20px; background:#1a0a2e; border:1px solid #3d2b1f; color:#d4c8a0; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('btnRitual').addEventListener('click', () => {
+          const n = document.getElementById('selN').value, s = document.getElementById('selS').value, l = document.getElementById('selL').value, o = document.getElementById('selO').value;
+          if (!n || !s || !l || !o) { msg('Posicione todos os 4 artefatos.'); return; }
+          if (n === 'calice' && s === 'adaga' && l === 'amuleto' && o === 'grimorio') {
+            UIPanel.hide('puzzle-panel'); timer.stop();
+            UISuccessOverlay.show('success-overlay', { title: '🎉 O SELO FOI QUEBRADO!', subtitle: 'O contra-ritual foi completado. A porta se abre. Os Blackwood podem finalmente descansar.', time: timer.format(), links: [{ text: '← Voltar ao Lobby', href: '../index.html' }] });
+          } else { msg('❌ O ritual falha. As velas piscam. A disposição está errada.'); }
+        });
+        document.getElementById('btnCancelar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do altar.'); });
+      }, 50);
+    }
+
+    // INPUT
+    input.onClick((x, y) => { if (EscapeTransitions.isTransitioning()) return; const obj = input.hitTest(x, y, getObjetos()); if (obj) interagir(obj); });
+
+    // RENDER
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'salao') renderSalao(ctx);
+      else if (amb === 'biblioteca') renderBiblioteca(ctx);
+      else renderPorao(ctx);
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
+      dust.update(dt); dust.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    function renderSalao(ctx) {
+      ctx.fillStyle = '#1a0a2e'; ctx.fillRect(0, 0, 900, 420);
+      ctx.fillStyle = '#0d0805'; ctx.fillRect(0, 420, 900, 180);
+      ctx.strokeStyle = '#3d2b1f'; ctx.beginPath(); ctx.moveTo(0,420); ctx.lineTo(900,420); ctx.stroke();
+      // Lareira
+      ctx.fillStyle = '#1a0f0a'; ctx.fillRect(55, 360, 170, 150); ctx.strokeStyle = '#4d3b2f'; ctx.strokeRect(55, 360, 170, 150);
+      const fireY = Math.sin(Date.now()/300) * 5;
+      ctx.fillStyle = '#ff6600'; ctx.beginPath(); ctx.ellipse(140, 480+fireY, 30, 40, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.ellipse(130, 485+fireY, 15, 25, 0, 0, Math.PI*2); ctx.fill();
+      // Retratos
+      ctx.fillStyle = '#111'; ctx.fillRect(205, 45, 110, 140); ctx.strokeStyle = '#8b6914'; ctx.lineWidth = 3; ctx.strokeRect(205, 45, 110, 140);
+      ctx.fillStyle = '#111'; ctx.fillRect(605, 45, 90, 130); ctx.strokeStyle = '#8b6914'; ctx.strokeRect(605, 45, 90, 130);
+      ctx.fillStyle = '#555'; ctx.font = '28px serif'; ctx.fillText('👤👤', 225, 120); ctx.fillText('👤', 635, 115); ctx.lineWidth = 1;
+      // Relógio
+      ctx.fillStyle = '#1a1a1a'; ctx.fillRect(425, 35, 60, 110); ctx.strokeStyle = '#3d2b1f'; ctx.strokeRect(425, 35, 60, 110);
+      ctx.fillStyle = '#d4af37'; ctx.font = '11px monospace'; ctx.fillText('9:37', 438, 90);
+      // Poltrona
+      ctx.fillStyle = '#2a1020'; ctx.fillRect(355, 405, 120, 90); ctx.strokeStyle = '#4d2040'; ctx.strokeRect(355, 405, 120, 90);
+      // Cofre
+      if (state.get('retratoFilha')) { ctx.fillStyle = '#0a0a0a'; ctx.fillRect(625, 205, 80, 70); ctx.strokeStyle = state.get('cofreAberto') ? '#d4af37' : '#555'; ctx.strokeRect(625, 205, 80, 70); }
+      // Porta biblioteca
+      ctx.fillStyle = '#0d0805'; ctx.fillRect(785, 255, 65, 175); ctx.strokeStyle = '#3d2b1f'; ctx.strokeRect(785, 255, 65, 175);
+      ctx.fillStyle = '#aa8833'; ctx.beginPath(); ctx.arc(800, 340, 4, 0, Math.PI*2); ctx.fill();
+    }
+
+    function renderBiblioteca(ctx) {
+      ctx.fillStyle = '#1a1008'; ctx.fillRect(0, 0, 900, 430);
+      ctx.fillStyle = '#0d0a05'; ctx.fillRect(0, 430, 900, 170);
+      ctx.strokeStyle = '#3d2b1f'; ctx.beginPath(); ctx.moveTo(0,430); ctx.lineTo(900,430); ctx.stroke();
+      // Estantes
+      ctx.fillStyle = '#1a0f08'; ctx.fillRect(35, 35, 190, 390); ctx.strokeStyle = '#3d2b1f'; ctx.strokeRect(35, 35, 190, 390);
+      const cores = ['#8b0000','#006400','#00008b','#8b8000','#4b0082','#8b4513'];
+      for (let row = 0; row < 4; row++) { for (let i = 0; i < 6; i++) { ctx.fillStyle = cores[i]; ctx.fillRect(50 + i*25, 55 + row*90, 20, 55); } }
+      // Grimório destaque
+      ctx.fillStyle = state.get('grimorio') ? '#4d0000' : '#cc0000'; ctx.fillRect(55, 185, 35, 50);
+      if (!state.get('grimorio')) { ctx.strokeStyle = '#d4af37'; ctx.strokeRect(55, 185, 35, 50); }
+      // Escrivaninha
+      ctx.fillStyle = '#2a1f14'; ctx.fillRect(355, 305, 170, 110); ctx.strokeStyle = '#4d3b2f'; ctx.strokeRect(355, 305, 170, 110);
+      // Diário
+      ctx.fillStyle = '#3a2a1a'; ctx.fillRect(385, 315, 55, 35); ctx.strokeStyle = '#5a4a30'; ctx.strokeRect(385, 315, 55, 35);
+      // Globo
+      ctx.fillStyle = '#1a2a1a'; ctx.beginPath(); ctx.arc(640, 190, 35, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#3a5a3a'; ctx.beginPath(); ctx.arc(640, 190, 35, 0, Math.PI*2); ctx.stroke();
+      // Espelho
+      ctx.fillStyle = '#111'; ctx.fillRect(705, 65, 65, 115); ctx.strokeStyle = '#8b6914'; ctx.lineWidth = 2; ctx.strokeRect(705, 65, 65, 115); ctx.lineWidth = 1;
+      // Candelabro
+      ctx.fillStyle = '#333'; ctx.fillRect(575, 380, 8, 55);
+      const candleGlow = state.get('candelabro') ? '#d4af37' : '#444';
+      ctx.fillStyle = candleGlow; ctx.beginPath(); ctx.arc(579, 370, 10, 0, Math.PI*2); ctx.fill();
+      // Porta porão
+      ctx.fillStyle = '#0d0805'; ctx.fillRect(785, 405, 75, 135); ctx.strokeStyle = state.get('passagemPorao') ? '#d4af37' : '#3d2b1f'; ctx.strokeRect(785, 405, 75, 135);
+      // Voltar
+      ctx.fillStyle = '#1a0a2e'; ctx.fillRect(35, 525, 115, 45); ctx.strokeStyle = '#3d2b1f'; ctx.strokeRect(35, 525, 115, 45);
+      ctx.fillStyle = '#8b7355'; ctx.font = '11px monospace'; ctx.fillText('← Salão', 60, 552);
+    }
+
+    function renderPorao(ctx) {
+      ctx.fillStyle = '#0a0a12'; ctx.fillRect(0, 0, 900, 600);
+      // Círculo ritual
+      ctx.strokeStyle = '#d4af3744'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(450, 300, 150, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(450,150); ctx.lineTo(450,450); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(300,300); ctx.lineTo(600,300); ctx.stroke();
+      ctx.lineWidth = 1;
+      // Labels
+      ctx.fillStyle = '#d4af3788'; ctx.font = '11px monospace';
+      ctx.fillText('N', 443, 145); ctx.fillText('S', 443, 465); ctx.fillText('L', 605, 305); ctx.fillText('O', 285, 305);
+      // Altar centro
+      ctx.fillStyle = '#1a1520'; ctx.fillRect(400, 250, 100, 80); ctx.strokeStyle = '#3d2b3f'; ctx.strokeRect(400, 250, 100, 80);
+      ctx.fillStyle = '#d4af37'; ctx.font = '10px monospace'; ctx.fillText('ALTAR', 430, 295);
+      // Gravuras
+      ctx.fillStyle = '#1a1a1a'; ctx.fillRect(55, 85, 145, 195); ctx.strokeStyle = '#3a3a3a'; ctx.strokeRect(55, 85, 145, 195);
+      ctx.fillStyle = '#666'; ctx.font = '20px serif'; ctx.fillText('🏆🗡️', 80, 160); ctx.fillText('🔮📕', 80, 220);
+      // Velas
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.arc(720 + (i%2)*40, 220 + Math.floor(i/2)*40, 5, 0, Math.PI*2); ctx.fill(); }
+      // Pedestal
+      ctx.fillStyle = state.get('pedestal') ? '#1a1520' : '#2a2030'; ctx.fillRect(105, 405, 70, 70); ctx.strokeStyle = '#4a3a5a'; ctx.strokeRect(105, 405, 70, 70);
+      if (!state.get('pedestal')) { ctx.fillStyle = '#d4af37'; ctx.font = '20px serif'; ctx.fillText('🔮', 125, 450); }
+      // Porta selada
+      ctx.fillStyle = '#0a0a14'; ctx.fillRect(755, 405, 75, 145); ctx.strokeStyle = '#d4af3744'; ctx.strokeRect(755, 405, 75, 145);
+      const glow = Math.sin(Date.now()/800) * 0.3 + 0.5;
+      ctx.fillStyle = `rgba(212,175,55,${glow * 0.15})`; ctx.fillRect(755, 405, 75, 145);
+      // Voltar
+      ctx.fillStyle = '#1a0a2e'; ctx.fillRect(35, 525, 115, 45); ctx.strokeStyle = '#3d2b1f'; ctx.strokeRect(35, 525, 115, 45);
+      ctx.fillStyle = '#8b7355'; ctx.font = '11px monospace'; ctx.fillText('← Biblioteca', 45, 552);
+    }
+
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>

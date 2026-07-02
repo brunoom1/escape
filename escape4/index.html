@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 4 — Estação Espacial</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #050810;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      gap: 12px;
+    }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #1a3a5a; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/events.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/scifi.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+
+  <script>
+    UITokens.apply(ThemeSciFi);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#050810' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'comando', flags: {
+      terminal: false, mapa: false, cadeira: false, cartaoColetado: false, janela: false,
+      painelFusiveis: false, gerador: false, armario: false, fusivelColetado: false,
+      duto: false, energiaRestaurada: false,
+      painelIgnicao: false, visor: false, manualEmerg: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+
+    UITabs.create('tabs', [
+      { id: 'comando', label: 'Comando', locked: false },
+      { id: 'energia', label: 'Energia', locked: true },
+      { id: 'capsula', label: 'Cápsula', locked: true }
+    ], (tabId) => {
+      if (tabId === 'energia' && !state.get('cartaoColetado')) { msg('🔒 Acesso ao módulo de energia requer cartão de autorização.'); UITabs.setActive('tabs', 'comando'); return; }
+      if (tabId === 'capsula' && !state.get('energiaRestaurada')) { msg('🔒 Módulo da cápsula sem energia. Restaure o gerador primeiro.'); UITabs.setActive('tabs', 'energia'); return; }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmb(tabId); });
+    });
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
+
+    const stars = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(150,200,255,0.3)', count: 40, speedX: [-0.5,0.5], speedY: [-0.3,0.3], size: [0.5,1.5], life: [8,20] });
+
+    function msg(t) { UIMessageBox.show('message', t); }
+    function msgAmb(a) {
+      if (a === 'comando') msg('Módulo de Comando. Telas apagadas, luzes de emergência. O silêncio do espaço é absoluto.');
+      else if (a === 'energia') msg('Módulo de Energia. O gerador principal está offline. Fusíveis queimados. Precisa restaurar.');
+      else msg('Módulo da Cápsula. O painel de ignição aguarda a sequência correta para lançamento.');
+    }
+    msg('Você acorda numa estação espacial à deriva. Sistemas offline. Gravidade artificial falhando. Encontre a cápsula de fuga.');
+    timer.start();
+
+    // OBJETOS
+    const objetosComando = [
+      { id: 'terminal', x: 300, y: 50, w: 200, h: 130, label: 'Terminal principal' },
+      { id: 'mapa', x: 600, y: 40, w: 150, h: 120, label: 'Mapa da estação' },
+      { id: 'cadeira', x: 380, y: 300, w: 140, h: 120, label: 'Cadeira do capitão' },
+      { id: 'janela', x: 50, y: 60, w: 180, h: 200, label: 'Janela espacial' },
+      { id: 'portaEnergia', x: 780, y: 250, w: 70, h: 180, label: 'Porta → Energia' },
+    ];
+    const objetosEnergia = [
+      { id: 'painelFusiveis', x: 300, y: 50, w: 250, h: 150, label: 'Painel de fusíveis' },
+      { id: 'gerador', x: 60, y: 150, w: 180, h: 200, label: 'Gerador principal' },
+      { id: 'armario', x: 650, y: 100, w: 120, h: 180, label: 'Armário técnico' },
+      { id: 'duto', x: 400, y: 400, w: 200, h: 100, label: 'Duto de ventilação' },
+      { id: 'portaComando', x: 30, y: 450, w: 100, h: 100, label: '← Comando' },
+      { id: 'portaCapsula', x: 780, y: 300, w: 70, h: 150, label: 'Porta → Cápsula' },
+    ];
+    const objetosCapsula = [
+      { id: 'painelIgnicao', x: 250, y: 60, w: 400, h: 180, label: 'Painel de ignição' },
+      { id: 'visor', x: 50, y: 80, w: 150, h: 150, label: 'Visor da cápsula' },
+      { id: 'manualEmerg', x: 700, y: 300, w: 120, h: 100, label: 'Manual de emergência' },
+      { id: 'voltarEnergia', x: 30, y: 480, w: 120, h: 60, label: '← Energia' },
+    ];
+    function getObjetos() {
+      const a = state.getAmbiente();
+      if (a === 'comando') return objetosComando;
+      if (a === 'energia') return objetosEnergia;
+      return objetosCapsula;
+    }
+
+    // INTERAÇÕES
+    // Sequência de ignição correta: Motor → Oxigênio → Navegação → Propulsão (M-O-N-P)
+    // Pistas: terminal diz "sistemas na ordem de dependência", gerador revela "motor alimenta O2",
+    // duto revela "ventilação(O2) antes da navegação", manual diz "propulsão sempre por último"
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+      // COMANDO
+      if (id === 'terminal') {
+        if (!state.get('terminal')) { state.set('terminal', true); inv.add('log_dependencia', '🖥️', 'Log: "Ativar na ordem de dependência dos sistemas"'); msg('Terminal parcialmente funcional. Último log: "PROTOCOLO DE FUGA: Ativar sistemas na ordem de dependência. Cada sistema alimenta o próximo."'); }
+        else msg('Log: "Ativar na ordem de dependência. Cada sistema alimenta o próximo."');
+      } else if (id === 'mapa') {
+        if (!state.get('mapa')) { state.set('mapa', true); inv.add('mapa_estacao', '🗺️', 'Mapa: Comando → Energia → Cápsula'); msg('Mapa holográfico da estação. Três módulos conectados em série. O módulo de energia está entre comando e cápsula.'); }
+        else msg('Mapa: Comando → Energia → Cápsula.');
+      } else if (id === 'cadeira') {
+        if (!state.get('cadeira')) { state.set('cadeira', true); state.set('cartaoColetado', true); inv.add('cartao_cap', '💳', 'Cartão de autorização — Capitão Torres'); UITabs.unlock('tabs', 'energia'); msg('Embaixo da cadeira do capitão: um cartão de autorização magnético. "Cap. Torres — Nível Máximo". Módulo de energia desbloqueado!'); }
+        else msg('Nada mais sob a cadeira.');
+      } else if (id === 'janela') {
+        if (!state.get('janela')) { state.set('janela', true); inv.add('estrela_ref', '⭐', 'Estrela Proxima: referência de navegação'); msg('Pela janela: escuridão total exceto uma estrela brilhante. A placa identifica: "Proxima Centauri — Referência de Navegação". A cápsula precisa saber para onde ir.'); }
+        else msg('Proxima Centauri. Referência de navegação para a cápsula.');
+      } else if (id === 'portaEnergia') {
+        if (state.get('cartaoColetado')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('energia'); UITabs.setActive('tabs', 'energia'); msgAmb('energia'); }); }
+        else msg('Porta trancada. Precisa de cartão de autorização.');
+      }
+      // ENERGIA
+      else if (id === 'painelFusiveis') {
+        if (!state.get('painelFusiveis')) { state.set('painelFusiveis', true); msg('Painel de fusíveis. Slot 3 está vazio e queimado. Sem este fusível, o gerador não reinicia. Precisa de um sobressalente.'); }
+        else if (state.get('fusivelColetado') && !state.get('energiaRestaurada')) {
+          state.set('energiaRestaurada', true); UITabs.unlock('tabs', 'capsula');
+          msg('✅ Fusível instalado! O gerador ronca e as luzes se acendem. Módulo da cápsula desbloqueado!');
+        } else if (state.get('energiaRestaurada')) { msg('Painel completo. Energia restaurada.'); }
+        else msg('Slot 3 vazio. Precisa de fusível sobressalente.');
+      } else if (id === 'gerador') {
+        if (!state.get('gerador')) { state.set('gerador', true); inv.add('nota_motor', '⚙️', 'Gerador: "Motor alimenta sistema de O2"'); msg('Gerador offline. Placa técnica: "Fluxo de energia: MOTOR → Sistema O2 → demais sistemas." O motor é a base de tudo.'); }
+        else msg('Motor alimenta O2, que alimenta o restante.');
+      } else if (id === 'armario') {
+        if (!state.get('armario')) { state.set('armario', true); state.set('fusivelColetado', true); inv.add('fusivel', '🔌', 'Fusível sobressalente — Slot 3'); msg('Armário técnico. Dentro: um fusível sobressalente compatível com Slot 3! Leve ao painel.'); }
+        else msg('Armário vazio. Fusível já coletado.');
+      } else if (id === 'duto') {
+        if (!state.get('duto')) { state.set('duto', true); inv.add('nota_duto', '💨', 'Ventilação: "O2 deve estar ativo antes da navegação"'); msg('Dentro do duto, uma placa de manutenção: "ATENÇÃO: Ventilação(O2) DEVE estar ativa antes de iniciar navegação. Risco de hipóxia na cabine."'); }
+        else msg('O2 deve estar ativo antes da navegação.');
+      } else if (id === 'portaComando') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('comando'); UITabs.setActive('tabs', 'comando'); msg('De volta ao módulo de comando.'); });
+      } else if (id === 'portaCapsula') {
+        if (state.get('energiaRestaurada')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('capsula'); UITabs.setActive('tabs', 'capsula'); msgAmb('capsula'); }); }
+        else msg('Sem energia. Restaure o gerador primeiro.');
+      }
+
+      // CÁPSULA
+      else if (id === 'painelIgnicao') { abrirPainelIgnicao(); }
+      else if (id === 'visor') {
+        if (!state.get('visor')) { state.set('visor', true); msg('Visor mostra o espaço vazio e a rota calculada. Nota no painel: "Navegação requer referência estelar + O2 estável para tripulação."'); inv.add('nota_visor', '🪟', 'Navegação precisa de O2 estável + referência estelar'); }
+        else msg('Navegação requer O2 estável + referência estelar.');
+      } else if (id === 'manualEmerg') {
+        if (!state.get('manualEmerg')) { state.set('manualEmerg', true); inv.add('nota_manual', '📖', 'Manual: "Propulsão é SEMPRE o último sistema ativado"'); msg('Manual de Emergência, Cap. 7: "Em qualquer sequência de ignição, PROPULSÃO é o último sistema a ser ativado. Nunca inicie propulsão sem todos os outros online."'); }
+        else msg('Propulsão é sempre o último.');
+      } else if (id === 'voltarEnergia') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('energia'); UITabs.setActive('tabs', 'energia'); msg('De volta ao módulo de energia.'); });
+      }
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // PUZZLE FINAL: Sequência de ignição — Motor → Oxigênio → Navegação → Propulsão
+    function abrirPainelIgnicao() {
+      const sistemas = ['Motor', 'Oxigênio', 'Navegação', 'Propulsão'];
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🚀 Painel de Ignição — Sequência de ativação (4 sistemas)</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:14px;">Selecione a ordem correta de ativação dos sistemas:</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;">
+          ${[1,2,3,4].map(n => `<label style="color:#b8d4e8;">Posição ${n}: <select id="pos${n}" style="background:#080c18; border:1px solid #1a3a5a; color:#00d4ff; padding:6px; font-family:monospace; border-radius:4px; width:100%;"><option value="">—</option>${sistemas.map(s => `<option value="${s}">${s}</option>`).join('')}</select></label>`).join('')}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:14px;">
+          <button id="btnIgnicao" style="padding:8px 24px; background:#0a1020; border:1px solid #00d4ff; color:#00d4ff; font-family:monospace; cursor:pointer; border-radius:4px;">⚡ Iniciar Ignição</button>
+          <button id="btnCancelar" style="padding:8px 20px; background:#0a1020; border:1px solid #1a3a5a; color:#b8d4e8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('btnIgnicao').addEventListener('click', () => {
+          const seq = [1,2,3,4].map(n => document.getElementById('pos'+n).value);
+          if (seq.includes('')) { msg('Selecione todos os 4 sistemas.'); return; }
+          if (seq[0]==='Motor' && seq[1]==='Oxigênio' && seq[2]==='Navegação' && seq[3]==='Propulsão') {
+            UIPanel.hide('puzzle-panel'); timer.stop();
+            UISuccessOverlay.show('success-overlay', { title: '🚀 IGNIÇÃO BEM-SUCEDIDA!', subtitle: 'A cápsula se desacopla da estação. Você está a caminho de Proxima Centauri. Sobreviveu.', time: timer.format(), links: [{ text: '← Voltar ao Lobby', href: '../index.html' }] });
+          } else { msg('❌ Falha na ignição! Sistemas em conflito. A sequência está incorreta. Tente novamente.'); }
+        });
+        document.getElementById('btnCancelar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do painel de ignição.'); });
+      }, 50);
+    }
+
+    // INPUT
+    input.onClick((x, y) => { if (EscapeTransitions.isTransitioning()) return; const obj = input.hitTest(x, y, getObjetos()); if (obj) interagir(obj); });
+
+    // RENDER
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'comando') renderComando(ctx);
+      else if (amb === 'energia') renderEnergia(ctx);
+      else renderCapsula(ctx);
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
+      stars.update(dt); stars.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    function renderComando(ctx) {
+      ctx.fillStyle = '#0a1020'; ctx.fillRect(0, 0, 900, 600);
+      // Janela com estrelas
+      ctx.fillStyle = '#000005'; ctx.fillRect(55, 65, 170, 190); ctx.strokeStyle = '#1a3a5a'; ctx.lineWidth = 3; ctx.strokeRect(55, 65, 170, 190);
+      ctx.fillStyle = '#fff'; for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.arc(70+Math.random()*140, 80+Math.random()*160, 1, 0, Math.PI*2); ctx.fill(); }
+      ctx.fillStyle = '#ffffaa'; ctx.beginPath(); ctx.arc(140, 140, 8, 0, Math.PI*2); ctx.fill(); // Estrela principal
+      ctx.lineWidth = 1;
+      // Terminal
+      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(305, 55, 190, 120); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(305, 55, 190, 120);
+      ctx.fillStyle = '#001a2a'; ctx.fillRect(310, 60, 180, 100);
+      ctx.fillStyle = '#00d4ff'; ctx.font = '10px monospace'; ctx.fillText('STATION OS v7.1', 320, 80); ctx.fillText('> EMERGENCY MODE', 320, 95); ctx.fillText('> SYSTEMS OFFLINE', 320, 110);
+      // Mapa
+      ctx.fillStyle = '#0a1520'; ctx.fillRect(605, 45, 140, 110); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(605, 45, 140, 110);
+      ctx.fillStyle = '#00d4ff44'; ctx.font = '9px monospace'; ctx.fillText('CMD → ENG → CAP', 620, 100);
+      // Cadeira
+      ctx.fillStyle = '#1a1a2a'; ctx.fillRect(385, 305, 130, 110); ctx.strokeStyle = '#2a2a4a'; ctx.strokeRect(385, 305, 130, 110);
+      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('CAP. TORRES', 405, 365);
+      // Porta energia
+      ctx.fillStyle = '#0a0a14'; ctx.fillRect(785, 255, 65, 175); ctx.strokeStyle = state.get('cartaoColetado') ? '#00d4ff' : '#1a3a5a'; ctx.strokeRect(785, 255, 65, 175);
+      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('ENG →', 795, 345);
+    }
+
+    function renderEnergia(ctx) {
+      ctx.fillStyle = '#080c14'; ctx.fillRect(0, 0, 900, 600);
+      const pulse = state.get('energiaRestaurada') ? 0 : Math.sin(Date.now()/600)*0.15;
+      ctx.fillStyle = `rgba(255,100,0,${pulse})`; ctx.fillRect(0, 0, 900, 5);
+      // Painel fusíveis
+      ctx.fillStyle = '#0a1520'; ctx.fillRect(305, 55, 240, 140); ctx.strokeStyle = '#1a3a5a'; ctx.lineWidth = 2; ctx.strokeRect(305, 55, 240, 140);
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = (i===2 && !state.get('energiaRestaurada')) ? '#2a0a0a' : '#0a2a1a'; ctx.fillRect(320+i*44, 80, 35, 80); ctx.strokeStyle = (i===2 && !state.get('energiaRestaurada')) ? '#c62828' : '#2e7d32'; ctx.strokeRect(320+i*44, 80, 35, 80); }
+      ctx.lineWidth = 1;
+      // Gerador
+      ctx.fillStyle = '#0a0a14'; ctx.fillRect(65, 155, 170, 190); ctx.strokeStyle = state.get('energiaRestaurada') ? '#00d4ff' : '#333'; ctx.strokeRect(65, 155, 170, 190);
+      ctx.fillStyle = state.get('energiaRestaurada') ? '#00d4ff' : '#4a4a4a'; ctx.font = '12px monospace'; ctx.fillText(state.get('energiaRestaurada') ? 'ONLINE' : 'OFFLINE', 110, 255);
+      // Armário
+      ctx.fillStyle = '#1a1a2a'; ctx.fillRect(655, 105, 110, 170); ctx.strokeStyle = '#2a3a5a'; ctx.strokeRect(655, 105, 110, 170);
+      // Duto
+      ctx.fillStyle = '#0a0a10'; ctx.fillRect(405, 405, 190, 90); ctx.strokeStyle = '#1a2a3a'; ctx.strokeRect(405, 405, 190, 90);
+      ctx.fillStyle = '#333'; ctx.fillRect(420, 430, 160, 8); ctx.fillRect(420, 450, 160, 8); ctx.fillRect(420, 470, 160, 8);
+      // Portas
+      ctx.fillStyle = '#0a0a14'; ctx.fillRect(35, 455, 95, 95); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(35, 455, 95, 95);
+      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('← CMD', 52, 505);
+      ctx.fillStyle = '#0a0a14'; ctx.fillRect(785, 305, 65, 145); ctx.strokeStyle = state.get('energiaRestaurada') ? '#00d4ff' : '#1a3a5a'; ctx.strokeRect(785, 305, 65, 145);
+      ctx.fillStyle = '#4a7a9a'; ctx.fillText('CAP →', 795, 380);
+    }
+
+    function renderCapsula(ctx) {
+      ctx.fillStyle = '#050810'; ctx.fillRect(0, 0, 900, 600);
+      // Painel ignição
+      ctx.fillStyle = '#0a1520'; ctx.fillRect(255, 65, 390, 170); ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2; ctx.strokeRect(255, 65, 390, 170);
+      ctx.fillStyle = '#00d4ff'; ctx.font = '13px monospace'; ctx.fillText('PAINEL DE IGNIÇÃO', 370, 95);
+      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace';
+      ctx.fillText('[ 1: ___ ] → [ 2: ___ ] → [ 3: ___ ] → [ 4: ___ ]', 285, 150);
+      ctx.lineWidth = 1;
+      // Visor
+      ctx.fillStyle = '#000008'; ctx.fillRect(55, 85, 145, 140); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(55, 85, 145, 140);
+      ctx.fillStyle = '#ffffaa'; ctx.beginPath(); ctx.arc(127, 155, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#00d4ff44'; ctx.font = '8px monospace'; ctx.fillText('PROXIMA CENTAURI', 70, 210);
+      // Manual
+      ctx.fillStyle = '#1a1510'; ctx.fillRect(705, 305, 110, 90); ctx.strokeStyle = '#3a3020'; ctx.strokeRect(705, 305, 110, 90);
+      ctx.fillStyle = '#b8a888'; ctx.font = '10px monospace'; ctx.fillText('MANUAL', 735, 345); ctx.fillText('CAP. 7', 740, 360);
+      // Voltar
+      ctx.fillStyle = '#0a1020'; ctx.fillRect(35, 485, 115, 55); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(35, 485, 115, 55);
+      ctx.fillStyle = '#4a7a9a'; ctx.font = '11px monospace'; ctx.fillText('← Energia', 52, 517);
+    }
+
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>

@@ -31,7 +31,7 @@ O cofre exige o código **0847** — o número do caso policial que Moreira inve
 | Estante (geral) | "Uma estante cheia de livros. Alguns sobre direito penal, outros sobre contabilidade. Um livro vermelho se destaca na 3ª posição." | "O livro vermelho na 3ª posição parece diferente." | Cenário — prepara para a interação com o livro |
 | Estante (livro vermelho) | "Você puxa o livro vermelho. Um click mecânico. A estante desliza revelando uma passagem escura para um arquivo secreto!" | "A passagem para o arquivo está aberta." | Gate para o Ambiente 2 — justificado pela paranoia do detetive |
 | Luminária | "Ao acender a luminária, um bilhete no chão fica visível: 'Eles sabem do caso. Protocolei tudo no arquivo. — M'" | "Bilhete: 'Protocolei tudo no arquivo. — M'" | Reforça que as provas estão no arquivo (motiva explorar) |
-| Lixeira | "Papéis amassados. Um deles tem rabiscos: 'Não pode ser 847... é #0847? Sistema exige 4.' E um X riscado sobre '847'." | "Rabisco: '#0847? Sistema exige 4.' — riscado com frustração." | Pista decisiva: o código tem zero à esquerda |
+| Lixeira | "Papéis amassados. Um deles, escrito às pressas: 'O sistema rejeitou! Três dígitos não bastam. Preciso preencher até completar o formato.' Riscado com frustração." | "Nota amassada: 'Três dígitos não bastam. Preencher até completar o formato.'" | Indica indiretamente que o número do caso precisa de zero(s) à esquerda para completar 4 dígitos |
 | Cofre | *Abre painel de código* "Um cofre embutido na parede. Teclado numérico com 4 posições. Uma placa diz: 'Protocolo de Segurança Moreira'." | *Abre painel de código* | Puzzle principal — exige dedução |
 | Porta | "A porta está trancada por dentro. O mecanismo exige um cartão magnético que está dentro do cofre." | "Trancada. Precisa do cartão que está no cofre." | Explica por que o cofre é necessário para escapar |
 
@@ -73,7 +73,7 @@ O cofre exige o código **0847** — o número do caso policial que Moreira inve
 3. Encontra na gaveta a pista da estante (livro vermelho)
 4. Puxa o livro → passagem para o arquivo secreto
 5. No arquivo: gaveta A confirma "#0847", pasta confirma "código é o caso"
-6. Lixeira no escritório: reforça "não pode ser 847, é 0847"
+6. Lixeira no escritório: dica de que "três dígitos não bastam, preencher formato" (deduzir zero à esquerda)
 7. Vai ao cofre → digita 0847 → cofre abre
 8. Dentro: cartão magnético + pendrive com provas
 9. Usa cartão na porta → escapa

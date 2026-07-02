@@ -118,3 +118,22 @@ ui-kit/components/success-overlay.js — Tela de vitória
 | É componente visual de interface genérico? | → `ui-kit/` |
 | É específico de UMA sala (puzzle, altar)? | → código da sala |
 | Outro jogo de escape poderia usar com outro tema? | → `ui-kit/` |
+
+
+## Regra Anti-Spoiler (OBRIGATÓRIA em todas as salas)
+
+> **NENHUMA pista, texto, item de inventário ou interação pode conter a solução completa de um puzzle.**
+> O jogador SEMPRE deve precisar de dedução, interpretação ou cruzamento de pelo menos 2 pistas de fontes diferentes.
+
+### Critérios de validação para CADA pista criada:
+1. Se ler APENAS esta pista, resolve o puzzle? → **PROIBIDO**
+2. Precisa combinar com outra fonte? → OK
+3. A resposta está escrita literalmente? → **PROIBIDO**
+4. Existe ambiguidade que exige raciocínio? → OK
+
+### Labels de inventário:
+- NUNCA conter a resposta (ex: ❌ "Código: 0847" / ✅ "Nota: formato 4 dígitos")
+
+### Regra de mínimo:
+- Todo puzzle principal deve exigir **mínimo 2 pistas de ambientes/objetos diferentes** para ser resolvido
+- Nenhuma pista isolada pode revelar mais de 50% da solução

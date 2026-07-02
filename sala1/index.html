@@ -202,10 +202,10 @@
       } else if (id === 'lixeira') {
         if (!state.get('lixeira')) {
           state.set('lixeira', true);
-          inv.add('rabisco', '🗑️', '#0847 — exige 4 dígitos');
-          msg('Papéis amassados. Um rabisco: "Não pode ser 847... é #0847? Sistema exige 4." E um X riscado.');
+          inv.add('rabisco', '🗑️', 'Nota: "3 dígitos não bastam. Preencha com zeros à esquerda."');
+          msg('Papéis amassados. Um deles, escrito às pressas: "O sistema rejeitou! Três dígitos não bastam. Preciso preencher até completar o formato." Riscado com frustração.');
         } else {
-          msg('Rabisco: "#0847? Sistema exige 4." — riscado com frustração.');
+          msg('Nota amassada: "Três dígitos não bastam. Preencher até completar o formato."');
         }
       } else if (id === 'cofre') {
         abrirPainelCofre();
@@ -221,10 +221,10 @@
       else if (id === 'gavetaA') {
         if (!state.get('gavetaAVista')) {
           state.set('gavetaAVista', true);
-          inv.add('pasta0847', '📁', 'Pasta #0847 — confirmação');
-          msg('Pasta etiquetada "#0847 — Meridian". Dentro: fotos de reuniões secretas, extratos bancários. Nota: "Torres é o intermediário".');
+          inv.add('pasta0847', '📁', 'Pasta do caso — etiqueta com 4 dígitos');
+          msg('Pasta etiquetada com código de 4 dígitos. Dentro: fotos de reuniões secretas, extratos bancários. A etiqueta do caso usa formato numérico padronizado com zeros à esquerda.');
         } else {
-          msg('Caso #0847. A etiqueta confirma: quatro dígitos com zero.');
+          msg('A etiqueta da pasta usa formato numérico de 4 dígitos. O número do caso começa com zero.');
         }
       } else if (id === 'gavetaB') {
         if (!state.get('gavetaBVista')) {
