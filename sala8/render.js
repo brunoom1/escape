@@ -1,39 +1,24 @@
 /**
  * @module Sala8Render
- * @version 2.0.0
+ * @version 3.0.0
  * @description Renderização cinematográfica da Sala 8 — Pirâmide de Khufu
- * Padrão: 8 camadas (bg, arquitetura, iluminação, detalhes, decoração, objetos, atmosfera, overlay)
  * Ambientes: Antecâmara, Corredor, Câmara
- * Paleta: ThemeEgypt — bg #0d0a06, accent #e8b84a, border #3d3010
+ * Paleta: ThemeEgypt — bg #0d0a06, accent #d4a843, border #3d3010
  */
 
-// ============ PRÉ-CALCULADOS ============
 const ANTE_STONES = [];
-for (let row = 0; row < 10; row++) {
+for (let row = 0; row < 8; row++) {
   for (let col = 0; col < 7; col++) {
     ANTE_STONES.push({ x: col * 130 + (row % 2) * 65, y: row * 60 + 10, w: 125, h: 55 });
   }
 }
-const CORR_TORCHES = [{x:50,y:150},{x:850,y:150},{x:50,y:350},{x:850,y:350}];
-const CAM_JEWELS = [
-  {x:200,y:200,c:'#e8b84a'},{x:400,y:180,c:'#1565c0'},{x:600,y:190,c:'#c62828'},
-  {x:300,y:350,c:'#e8b84a'},{x:700,y:340,c:'#2e7d32'}
-];
+const CORR_TORCHES = [{x:220,y:150},{x:680,y:150},{x:220,y:380},{x:680,y:380}];
 
 // ============ ANTECÂMARA ============
 
 function renderAntecamara(ctx, state) {
-  renderAnte_Background(ctx);
-  renderAnte_Arquitetura(ctx);
-  renderAnte_Iluminacao(ctx);
-  renderAnte_Detalhes(ctx);
-  renderAnte_Decoracao(ctx);
-  renderAnte_Objetos(ctx, state);
-  renderAnte_Atmosfera(ctx);
-  renderAnte_Overlay(ctx);
-}
-
-function renderAnte_Background(ctx) {
+  const t = Date.now();
+  // Background
   const grad = ctx.createLinearGradient(0, 0, 0, 600);
   grad.addColorStop(0, '#0d0a06');
   grad.addColorStop(0.3, '#14100a');
@@ -41,218 +26,151 @@ function renderAnte_Background(ctx) {
   grad.addColorStop(1, '#0a0806');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 900, 600);
-}
 
-function renderAnte_Arquitetura(ctx) {
-  // Paredes de blocos de pedra calcária
+  // Stone block walls
   ctx.fillStyle = '#1a1408';
   ctx.fillRect(0, 0, 900, 480);
-  // Blocos
   ctx.strokeStyle = '#241a0c';
   ctx.lineWidth = 0.5;
   for (const s of ANTE_STONES) {
-    if (s.x < 900 && s.y < 480) {
-      ctx.strokeRect(s.x, s.y, s.w, s.h);
-    }
+    if (s.x < 900 && s.y < 480) ctx.strokeRect(s.x, s.y, s.w, s.h);
   }
   ctx.lineWidth = 1;
-  // Piso de pedra lisa
+
+  // Stone floor
   const floorGrad = ctx.createLinearGradient(0, 480, 0, 600);
   floorGrad.addColorStop(0, '#14100a');
   floorGrad.addColorStop(1, '#0a0806');
   ctx.fillStyle = floorGrad;
   ctx.fillRect(0, 480, 900, 120);
-  // Borda
   ctx.strokeStyle = '#3d3010';
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, 480); ctx.lineTo(900, 480); ctx.stroke();
   ctx.lineWidth = 1;
-  // Arco da entrada
-  ctx.strokeStyle = '#3d3010';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(300, 480); ctx.lineTo(300, 100);
-  ctx.quadraticCurveTo(450, 50, 600, 100);
-  ctx.lineTo(600, 480);
-  ctx.stroke();
-  ctx.lineWidth = 1;
-}
 
-function renderAnte_Iluminacao(ctx) {
-  // Tochas (sin-based)
-  const flicker = Math.sin(Date.now() / 250) * 0.3 + 0.7;
-  const torch1 = ctx.createRadialGradient(150, 200, 5, 150, 200, 150);
-  torch1.addColorStop(0, `rgba(232, 160, 50, ${0.1 * flicker})`);
-  torch1.addColorStop(1, 'transparent');
-  ctx.fillStyle = torch1;
-  ctx.fillRect(0, 50, 300, 350);
-  const torch2 = ctx.createRadialGradient(750, 200, 5, 750, 200, 150);
-  torch2.addColorStop(0, `rgba(232, 160, 50, ${0.1 * flicker})`);
-  torch2.addColorStop(1, 'transparent');
-  ctx.fillStyle = torch2;
-  ctx.fillRect(600, 50, 300, 350);
-}
-
-function renderAnte_Detalhes(ctx) {
-  // Areia acumulada nos cantos
-  ctx.fillStyle = 'rgba(60, 50, 20, 0.08)';
-  ctx.beginPath(); ctx.ellipse(100, 490, 80, 15, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(800, 490, 70, 12, 0, 0, Math.PI * 2); ctx.fill();
-  // Rachaduras
-  ctx.strokeStyle = 'rgba(40, 30, 15, 0.2)';
-  ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(450, 80); ctx.lineTo(455, 130); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(200, 300); ctx.lineTo(210, 330); ctx.stroke();
-  ctx.lineWidth = 1;
-}
-
-function renderAnte_Decoracao(ctx) {
-  // Tochas físicas
+  // Torches with sin-based flicker
+  const flicker = Math.sin(t / 250) * 0.3 + 0.7;
+  // Left torch
   ctx.fillStyle = '#3d2a10';
   ctx.fillRect(142, 160, 16, 80);
-  ctx.fillRect(742, 160, 16, 80);
-  // Chamas
-  ctx.fillStyle = '#e8a030';
+  ctx.fillStyle = `rgba(232,160,50,${flicker})`;
   ctx.beginPath(); ctx.ellipse(150, 155, 8, 12, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#ffcc00';
+  ctx.fillStyle = `rgba(255,204,0,${flicker * 0.8})`;
   ctx.beginPath(); ctx.ellipse(150, 152, 4, 6, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#e8a030';
+  // Right torch
+  ctx.fillStyle = '#3d2a10';
+  ctx.fillRect(742, 160, 16, 80);
+  ctx.fillStyle = `rgba(232,160,50,${flicker})`;
   ctx.beginPath(); ctx.ellipse(750, 155, 8, 12, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#ffcc00';
+  ctx.fillStyle = `rgba(255,204,0,${flicker * 0.8})`;
   ctx.beginPath(); ctx.ellipse(750, 152, 4, 6, 0, 0, Math.PI * 2); ctx.fill();
-  // Hieróglifos decorativos no arco
-  ctx.fillStyle = '#e8b84a33';
-  ctx.font = '12px serif';
-  ctx.fillText('𓂀 𓁹 𓃭 𓆣', 380, 85);
-  // Escaravelho sobre a entrada
-  ctx.fillStyle = '#e8b84a55';
-  ctx.font = '20px serif';
-  ctx.fillText('𓆣', 435, 75);
-}
+  // Torch glow
+  const tGlow1 = ctx.createRadialGradient(150, 160, 5, 150, 160, 150);
+  tGlow1.addColorStop(0, `rgba(232,160,50,${0.1 * flicker})`);
+  tGlow1.addColorStop(1, 'transparent');
+  ctx.fillStyle = tGlow1;
+  ctx.fillRect(0, 50, 300, 350);
+  const tGlow2 = ctx.createRadialGradient(750, 160, 5, 750, 160, 150);
+  tGlow2.addColorStop(0, `rgba(232,160,50,${0.1 * flicker})`);
+  tGlow2.addColorStop(1, 'transparent');
+  ctx.fillStyle = tGlow2;
+  ctx.fillRect(600, 50, 300, 350);
 
-function renderAnte_Objetos(ctx, state) {
-  // --- ESTELA DE PEDRA (100, 100, 130, 220) ---
+  // Rosetta stone panel
   ctx.fillStyle = '#1a1408';
-  ctx.fillRect(105, 105, 120, 210);
+  ctx.fillRect(60, 80, 180, 280);
   ctx.strokeStyle = '#3d3010';
-  ctx.strokeRect(105, 105, 120, 210);
-  // Hieróglifos na estela
-  ctx.fillStyle = '#e8b84a88';
+  ctx.strokeRect(60, 80, 180, 280);
+  ctx.fillStyle = '#d4a84388';
   ctx.font = '14px serif';
-  ctx.fillText('𓁹 𓊪 𓎛', 120, 150);
-  ctx.fillText('𓇳 𓈖 𓏏', 120, 185);
-  ctx.fillText('𓌙 𓃀 𓂋', 120, 220);
-  ctx.fillStyle = '#e8b84a';
-  ctx.font = '8px Courier New';
-  ctx.fillText('"O olho vê', 115, 270);
-  ctx.fillText(' a verdade"', 115, 285);
+  ctx.fillText('\u{1F319} \u{1F4A7} \u{1F525}', 80, 130);
+  ctx.fillText('\u{2600} \u{1F3D4} \u{1F4A8}', 80, 165);
+  ctx.fillText('\u{1F331} \u{1F480}', 80, 200);
+  ctx.fillStyle = '#d4a843';
+  ctx.font = '9px Georgia';
+  ctx.fillText('Sol = \u2600\uFE0F', 80, 240);
+  ctx.fillText('\u00C1gua = \u{1F4A7}', 80, 258);
+  ctx.fillText('Terra = \u{1F3D4}\uFE0F', 80, 276);
+  ctx.fillText('Vida = \u{1F331}', 80, 294);
+  ctx.fillStyle = '#8a7a50';
+  ctx.font = '8px Georgia';
+  ctx.fillText('(os demais...)', 80, 320);
+  ctx.fillText('permanecem ocultos', 80, 335);
 
-  // --- ALTAR (350, 200, 200, 120) ---
-  const altGrad = ctx.createLinearGradient(350, 200, 350, 320);
-  altGrad.addColorStop(0, '#2a2010');
-  altGrad.addColorStop(1, '#1a1408');
-  ctx.fillStyle = altGrad;
-  ctx.fillRect(355, 205, 190, 110);
-  ctx.strokeStyle = '#e8b84a';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(355, 205, 190, 110);
-  ctx.lineWidth = 1;
-  // Objetos no altar
-  ctx.fillStyle = '#e8b84a';
-  ctx.beginPath(); ctx.arc(400, 260, 8, 0, Math.PI * 2); ctx.fill(); // ankh
-  ctx.fillStyle = '#1565c0';
-  ctx.beginPath(); ctx.arc(450, 260, 6, 0, Math.PI * 2); ctx.fill(); // lapis
-  ctx.fillStyle = '#c62828';
-  ctx.beginPath(); ctx.arc(500, 260, 7, 0, Math.PI * 2); ctx.fill(); // rubi
+  // Papyrus fragments
+  if (!state.get('fragmento1')) {
+    ctx.fillStyle = '#3d2a10';
+    ctx.fillRect(380, 420, 140, 60);
+    ctx.strokeStyle = '#5a4a30';
+    ctx.strokeRect(380, 420, 140, 60);
+    ctx.fillStyle = '#d4a84388';
+    ctx.font = '8px Georgia';
+    ctx.fillText('fragmento de papiro', 393, 455);
+  }
 
-  // --- MURAL DE ANÚBIS (650, 80, 150, 250) ---
-  ctx.fillStyle = '#141008';
-  ctx.fillRect(655, 85, 140, 240);
-  ctx.strokeStyle = '#3d3010';
-  ctx.strokeRect(655, 85, 140, 240);
-  // Silhueta de Anúbis
-  ctx.fillStyle = '#e8b84a44';
-  ctx.beginPath();
-  ctx.moveTo(725, 120); ctx.lineTo(710, 180); ctx.lineTo(700, 280);
-  ctx.lineTo(750, 280); ctx.lineTo(740, 180);
-  ctx.closePath(); ctx.fill();
-  // Cabeça de chacal
-  ctx.beginPath();
-  ctx.moveTo(725, 120); ctx.lineTo(715, 100); ctx.lineTo(735, 100);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#e8b84a';
-  ctx.font = '8px Courier New';
-  ctx.fillText('ANÚBIS', 705, 305);
+  // Canopic jars
+  ctx.fillStyle = '#2a1a0a';
+  for (let i = 0; i < 4; i++) {
+    const jx = 620 + i * 40;
+    ctx.beginPath(); ctx.ellipse(jx, 440, 14, 25, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#d4a84344';
+    ctx.beginPath(); ctx.ellipse(jx, 440, 14, 25, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#d4a84366';
+    ctx.beginPath(); ctx.ellipse(jx, 415, 8, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a1a0a';
+  }
 
-  // --- PASSAGEM AO CORREDOR (380, 400, 140, 100) ---
+  // Passage to corredor
   ctx.fillStyle = '#0a0806';
-  ctx.fillRect(385, 405, 130, 90);
-  ctx.strokeStyle = state.get('estelaLida') ? '#e8b84a' : '#3d3010';
+  ctx.fillRect(785, 200, 80, 200);
+  ctx.strokeStyle = state.get('temTocha') ? '#d4a843' : '#3d3010';
   ctx.lineWidth = 2;
-  ctx.strokeRect(385, 405, 130, 90);
+  ctx.strokeRect(785, 200, 80, 200);
   ctx.lineWidth = 1;
   ctx.fillStyle = '#8a7a50';
-  ctx.font = '10px Courier New';
-  ctx.fillText('CORREDOR →', 400, 455);
+  ctx.font = '9px Georgia';
+  ctx.fillText('CORREDOR \u2192', 795, 305);
 
-  // --- VOLTAR (30, 520, 120, 50) ---
-  ctx.fillStyle = '#14100a';
-  ctx.fillRect(35, 525, 115, 45);
-  ctx.strokeStyle = '#3d3010';
-  ctx.strokeRect(35, 525, 115, 45);
-  ctx.fillStyle = '#8a7a50';
-  ctx.font = '10px Courier New';
-  ctx.fillText('← Saída', 55, 552);
-}
+  // Torch on wall (collectible)
+  if (!state.get('temTocha')) {
+    ctx.fillStyle = '#3d2a10';
+    ctx.fillRect(440, 100, 12, 60);
+    ctx.fillStyle = '#e8a030';
+    ctx.beginPath(); ctx.ellipse(446, 95, 7, 10, 0, 0, Math.PI * 2); ctx.fill();
+  }
 
-function renderAnte_Atmosfera(ctx) {
-  // Poeira no ar
+  // Dust atmosphere
   ctx.save();
   ctx.globalAlpha = 0.015;
-  ctx.fillStyle = '#e8b84a';
-  const driftY = Math.sin(Date.now() / 4000) * 30;
-  ctx.beginPath(); ctx.arc(350, 250 + driftY, 100, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#d4a843';
+  const driftY = Math.sin(t / 4000) * 30;
+  ctx.beginPath(); ctx.arc(450, 300 + driftY, 120, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
-}
 
-function renderAnte_Overlay(ctx) {
-  const vignette = ctx.createRadialGradient(450, 300, 100, 450, 300, 500);
-  vignette.addColorStop(0, 'transparent');
-  vignette.addColorStop(0.7, 'rgba(10, 8, 4, 0.3)');
-  vignette.addColorStop(1, 'rgba(10, 8, 4, 0.65)');
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, 900, 600);
-  ctx.fillStyle = 'rgba(15, 12, 5, 0.06)';
+  // Vignette
+  const vig = ctx.createRadialGradient(450, 300, 100, 450, 300, 500);
+  vig.addColorStop(0, 'transparent');
+  vig.addColorStop(0.7, 'rgba(10, 8, 4, 0.3)');
+  vig.addColorStop(1, 'rgba(10, 8, 4, 0.65)');
+  ctx.fillStyle = vig;
   ctx.fillRect(0, 0, 900, 600);
 }
 
 // ============ CORREDOR ============
 
 function renderCorredor(ctx, state) {
-  renderCorr_Background(ctx);
-  renderCorr_Arquitetura(ctx);
-  renderCorr_Iluminacao(ctx);
-  renderCorr_Detalhes(ctx);
-  renderCorr_Decoracao(ctx);
-  renderCorr_Objetos(ctx, state);
-  renderCorr_Atmosfera(ctx);
-  renderCorr_Overlay(ctx);
-}
-
-function renderCorr_Background(ctx) {
+  const t = Date.now();
+  // Background
   const grad = ctx.createLinearGradient(0, 0, 0, 600);
   grad.addColorStop(0, '#0a0806');
   grad.addColorStop(0.5, '#0e0c08');
   grad.addColorStop(1, '#080604');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 900, 600);
-}
 
-function renderCorr_Arquitetura(ctx) {
-  // Corredor estreito com perspectiva
+  // Narrow perspective (converging walls)
   ctx.fillStyle = '#14100a';
   ctx.fillRect(0, 0, 900, 600);
-  // Paredes convergentes (perspectiva)
   ctx.fillStyle = '#1a1408';
   ctx.beginPath();
   ctx.moveTo(0, 0); ctx.lineTo(200, 80); ctx.lineTo(200, 520); ctx.lineTo(0, 600);
@@ -260,161 +178,100 @@ function renderCorr_Arquitetura(ctx) {
   ctx.beginPath();
   ctx.moveTo(900, 0); ctx.lineTo(700, 80); ctx.lineTo(700, 520); ctx.lineTo(900, 600);
   ctx.closePath(); ctx.fill();
-  // Linhas de perspectiva
+  // Perspective lines
   ctx.strokeStyle = '#241a0c';
-  ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(200, 80); ctx.lineTo(700, 80); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(200, 520); ctx.lineTo(700, 520); ctx.stroke();
-  // Teto
+  // Ceiling & floor
   ctx.fillStyle = '#0e0c08';
   ctx.fillRect(200, 80, 500, 30);
-  // Piso
   ctx.fillStyle = '#100c06';
   ctx.fillRect(200, 490, 500, 30);
-  // Blocos nas paredes laterais
-  ctx.strokeStyle = '#241a0c';
-  ctx.lineWidth = 0.5;
+
+  // Floor tiles with hieroglyphs
+  ctx.strokeStyle = '#3d301044';
   for (let i = 0; i < 6; i++) {
-    ctx.strokeRect(210, 115 + i * 60, 480, 55);
-  }
-  ctx.lineWidth = 1;
-}
-
-function renderCorr_Iluminacao(ctx) {
-  // Tochas nos suportes
-  for (const t of CORR_TORCHES) {
-    const flicker = Math.sin(Date.now() / 200 + t.x * 0.1) * 0.3 + 0.7;
-    const glow = ctx.createRadialGradient(t.x, t.y, 3, t.x, t.y, 80);
-    glow.addColorStop(0, `rgba(232, 150, 40, ${0.08 * flicker})`);
-    glow.addColorStop(1, 'transparent');
-    ctx.fillStyle = glow;
-    ctx.fillRect(t.x - 80, t.y - 80, 160, 160);
-  }
-}
-
-function renderCorr_Detalhes(ctx) {
-  // Teias de aranha nos cantos
-  ctx.strokeStyle = 'rgba(80, 70, 50, 0.06)';
-  ctx.lineWidth = 0.3;
-  ctx.beginPath(); ctx.moveTo(200, 80); ctx.lineTo(230, 110); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(200, 80); ctx.lineTo(210, 115); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(700, 80); ctx.lineTo(680, 105); ctx.stroke();
-  ctx.lineWidth = 1;
-  // Areia no piso
-  ctx.fillStyle = 'rgba(50, 40, 15, 0.06)';
-  ctx.fillRect(250, 500, 400, 15);
-}
-
-function renderCorr_Decoracao(ctx) {
-  // Tochas físicas nos suportes
-  for (const t of CORR_TORCHES) {
-    ctx.fillStyle = '#3d2a10';
-    ctx.fillRect(t.x - 4, t.y, 8, 50);
-    ctx.fillStyle = '#e8a030';
-    ctx.beginPath(); ctx.ellipse(t.x, t.y - 5, 6, 10, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffcc00';
-    ctx.beginPath(); ctx.ellipse(t.x, t.y - 8, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
-  }
-  // Hieróglifos nas paredes (faixa decorativa)
-  ctx.fillStyle = '#e8b84a22';
-  ctx.font = '10px serif';
-  ctx.fillText('𓁹 𓂋 𓃀 𓇳 𓈖 𓊪 𓌙 𓎛', 250, 105);
-}
-
-function renderCorr_Objetos(ctx, state) {
-  // --- ARMADILHA DE PISO (300, 250, 300, 100) ---
-  ctx.fillStyle = '#100c06';
-  ctx.fillRect(305, 255, 290, 90);
-  ctx.strokeStyle = '#e8b84a';
-  ctx.lineWidth = 1;
-  // Padrão de placas de pressão
-  for (let i = 0; i < 4; i++) {
-    for (let j = 0; j < 2; j++) {
-      ctx.strokeRect(315 + i * 68, 265 + j * 40, 60, 35);
+    for (let j = 0; j < 3; j++) {
+      ctx.strokeRect(220 + i * 78, 395 + j * 40, 74, 36);
     }
   }
-  ctx.fillStyle = '#e8b84a';
-  ctx.font = '8px Courier New';
-  ctx.fillText('PLACAS DE PRESSÃO', 370, 340);
 
-  // --- RELEVO NA PAREDE (250, 130, 400, 100) ---
+  // Torches
+  for (const tc of CORR_TORCHES) {
+    const fl = Math.sin(t / 200 + tc.x * 0.1) * 0.3 + 0.7;
+    ctx.fillStyle = '#3d2a10';
+    ctx.fillRect(tc.x - 4, tc.y, 8, 50);
+    ctx.fillStyle = `rgba(232,160,50,${fl})`;
+    ctx.beginPath(); ctx.ellipse(tc.x, tc.y - 5, 6, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(255,204,0,${fl * 0.8})`;
+    ctx.beginPath(); ctx.ellipse(tc.x, tc.y - 8, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
+    const glow = ctx.createRadialGradient(tc.x, tc.y, 3, tc.x, tc.y, 80);
+    glow.addColorStop(0, `rgba(232, 150, 40, ${0.08 * fl})`);
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.fillRect(tc.x - 80, tc.y - 80, 160, 160);
+  }
+
+  // Mural panels on walls
+  // Left mural
   ctx.fillStyle = '#1a1408';
-  ctx.fillRect(255, 135, 390, 90);
+  ctx.fillRect(50, 120, 140, 220);
   ctx.strokeStyle = '#3d3010';
-  ctx.strokeRect(255, 135, 390, 90);
-  // Figuras egípcias
-  ctx.fillStyle = '#e8b84a66';
-  ctx.font = '22px serif';
-  ctx.fillText('𓀀 𓁐 𓂧 𓃭 𓆣', 300, 190);
+  ctx.strokeRect(50, 120, 140, 220);
+  ctx.fillStyle = '#d4a84366';
+  ctx.font = '16px serif';
+  ctx.fillText('\u2600\uFE0F \u2194 \u{1F319}', 75, 200);
+  ctx.fillText('\u{1F4A7} \u2194 \u{1F525}', 75, 240);
 
-  // --- NICHO COM ITEM (650, 200, 100, 150) ---
-  ctx.fillStyle = '#0a0806';
-  ctx.fillRect(655, 205, 90, 140);
-  ctx.strokeStyle = '#e8b84a';
-  ctx.strokeRect(655, 205, 90, 140);
-  // Ânfora
-  ctx.fillStyle = '#3d2a10';
-  ctx.beginPath(); ctx.ellipse(700, 300, 20, 30, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#e8b84a44';
-  ctx.beginPath(); ctx.ellipse(700, 300, 12, 18, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#8a7a50';
-  ctx.font = '8px Courier New';
-  ctx.fillText('ÂNFORA', 677, 340);
+  // Right mural
+  ctx.fillStyle = '#1a1408';
+  ctx.fillRect(710, 120, 140, 220);
+  ctx.strokeStyle = '#3d3010';
+  ctx.strokeRect(710, 120, 140, 220);
+  ctx.fillStyle = '#d4a84366';
+  ctx.font = '16px serif';
+  ctx.fillText('\u{1F3D4}\uFE0F \u2194 \u{1F4A8}', 730, 200);
+  ctx.fillText('\u{1F331} \u2194 \u{1F480}', 730, 240);
 
-  // --- PORTA CÂMARA (400, 400, 100, 120) ---
+  // Inscription on ceiling (fragmento2)
+  ctx.fillStyle = '#d4a84344';
+  ctx.font = '10px Georgia';
+  ctx.fillText('\u{1F4DC} inscri\u00E7\u00E3o no teto...', 350, 100);
+
+  // Door to Câmara
   ctx.fillStyle = '#0e0a06';
-  ctx.fillRect(405, 405, 90, 110);
-  ctx.strokeStyle = state.get('passagemAberta') ? '#e8b84a' : '#3d3010';
+  ctx.fillRect(405, 395, 90, 120);
+  ctx.strokeStyle = state.get('tilesResolvido') ? '#d4a843' : '#3d3010';
   ctx.lineWidth = 2;
-  ctx.strokeRect(405, 405, 90, 110);
+  ctx.strokeRect(405, 395, 90, 120);
   ctx.lineWidth = 1;
   ctx.fillStyle = '#8a7a50';
-  ctx.font = '9px Courier New';
-  ctx.fillText('CÂMARA →', 415, 465);
+  ctx.font = '9px Georgia';
+  ctx.fillText('C\u00C2MARA \u2192', 415, 460);
 
-  // --- VOLTAR ANTECÂMARA (30, 520, 130, 50) ---
+  // Back to Antecâmara
   ctx.fillStyle = '#14100a';
-  ctx.fillRect(35, 525, 125, 45);
+  ctx.fillRect(35, 535, 125, 40);
   ctx.strokeStyle = '#3d3010';
-  ctx.strokeRect(35, 525, 125, 45);
+  ctx.strokeRect(35, 535, 125, 40);
   ctx.fillStyle = '#8a7a50';
-  ctx.font = '10px Courier New';
-  ctx.fillText('← Antecâm.', 42, 552);
-}
+  ctx.font = '10px Georgia';
+  ctx.fillText('\u2190 Antec\u00E2mara', 42, 560);
 
-function renderCorr_Atmosfera(ctx) {
-  ctx.save();
-  ctx.globalAlpha = 0.02;
-  ctx.fillStyle = '#e8b84a';
-  ctx.beginPath();
-  ctx.moveTo(450, 80); ctx.lineTo(350, 520); ctx.lineTo(550, 520);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
-
-function renderCorr_Overlay(ctx) {
-  const vignette = ctx.createRadialGradient(450, 300, 80, 450, 300, 480);
-  vignette.addColorStop(0, 'transparent');
-  vignette.addColorStop(0.6, 'rgba(8, 6, 3, 0.3)');
-  vignette.addColorStop(1, 'rgba(8, 6, 3, 0.7)');
-  ctx.fillStyle = vignette;
+  // Vignette
+  const vig2 = ctx.createRadialGradient(450, 300, 80, 450, 300, 480);
+  vig2.addColorStop(0, 'transparent');
+  vig2.addColorStop(0.6, 'rgba(8, 6, 3, 0.3)');
+  vig2.addColorStop(1, 'rgba(8, 6, 3, 0.7)');
+  ctx.fillStyle = vig2;
   ctx.fillRect(0, 0, 900, 600);
 }
 
 // ============ CÂMARA DO FARAÓ ============
 
 function renderCamara(ctx, state) {
-  renderCam_Background(ctx);
-  renderCam_Arquitetura(ctx);
-  renderCam_Iluminacao(ctx);
-  renderCam_Detalhes(ctx);
-  renderCam_Decoracao(ctx);
-  renderCam_Objetos(ctx, state);
-  renderCam_Atmosfera(ctx);
-  renderCam_Overlay(ctx);
-}
-
-function renderCam_Background(ctx) {
+  const t = Date.now();
+  // Background
   const grad = ctx.createLinearGradient(0, 0, 0, 600);
   grad.addColorStop(0, '#0a0806');
   grad.addColorStop(0.3, '#12100a');
@@ -422,193 +279,146 @@ function renderCam_Background(ctx) {
   grad.addColorStop(1, '#080604');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 900, 600);
-}
 
-function renderCam_Arquitetura(ctx) {
-  // Grande câmara — teto alto com vigas de pedra
+  // Grand chamber walls
   ctx.fillStyle = '#14100a';
   ctx.fillRect(0, 0, 900, 500);
-  // Vigas do teto
-  ctx.fillStyle = '#1a1408';
-  ctx.fillRect(0, 0, 900, 20);
-  ctx.fillRect(200, 15, 20, 10);
-  ctx.fillRect(450, 15, 20, 10);
-  ctx.fillRect(680, 15, 20, 10);
-  // Paredes com relevos
   ctx.strokeStyle = '#241a0c';
   ctx.lineWidth = 0.5;
-  for (let i = 0; i < 5; i++) {
-    ctx.strokeRect(i * 180 + 10, 25, 170, 470);
-  }
+  for (let i = 0; i < 5; i++) ctx.strokeRect(i * 180 + 10, 25, 170, 470);
   ctx.lineWidth = 1;
-  // Piso
+  // Floor
   ctx.fillStyle = '#100c06';
   ctx.fillRect(0, 500, 900, 100);
   ctx.strokeStyle = '#3d3010';
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, 500); ctx.lineTo(900, 500); ctx.stroke();
   ctx.lineWidth = 1;
-}
 
-function renderCam_Iluminacao(ctx) {
-  // Luz central mística (ouro)
-  const centerGlow = ctx.createRadialGradient(450, 300, 30, 450, 300, 350);
-  centerGlow.addColorStop(0, 'rgba(232, 184, 74, 0.06)');
-  centerGlow.addColorStop(0.5, 'rgba(200, 150, 50, 0.02)');
-  centerGlow.addColorStop(1, 'transparent');
-  ctx.fillStyle = centerGlow;
+  // Central mystical glow
+  const cGlow = ctx.createRadialGradient(450, 300, 30, 450, 300, 350);
+  cGlow.addColorStop(0, 'rgba(212, 164, 67, 0.06)');
+  cGlow.addColorStop(0.5, 'rgba(200, 150, 50, 0.02)');
+  cGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = cGlow;
   ctx.fillRect(100, 0, 700, 600);
-  // Glow das joias
-  for (const j of CAM_JEWELS) {
-    ctx.fillStyle = j.c + '11';
-    ctx.beginPath(); ctx.arc(j.x, j.y, 30, 0, Math.PI * 2); ctx.fill();
-  }
-}
 
-function renderCam_Detalhes(ctx) {
-  // Ouro nas juntas da pedra
-  ctx.fillStyle = 'rgba(232, 184, 74, 0.03)';
-  for (let i = 0; i < 5; i++) {
-    ctx.fillRect(i * 180 + 10, 25, 2, 470);
-    ctx.fillRect(i * 180 + 178, 25, 2, 470);
-  }
-}
-
-function renderCam_Decoracao(ctx) {
-  // Joias incrustadas nas paredes (decoração)
-  for (const j of CAM_JEWELS) {
-    ctx.fillStyle = j.c + '66';
-    ctx.beginPath(); ctx.arc(j.x, j.y, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#e8b84a';
-    ctx.beginPath(); ctx.arc(j.x, j.y, 5, 0, Math.PI * 2); ctx.stroke();
-  }
-  // Cartouche do faraó (centro-alto)
-  ctx.strokeStyle = '#e8b84a66';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.ellipse(450, 60, 60, 25, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = '#e8b84a88';
-  ctx.font = '14px serif';
-  ctx.fillText('𓇳 𓂋 𓆣', 420, 65);
-  ctx.lineWidth = 1;
-}
-
-function renderCam_Objetos(ctx, state) {
-  // --- SARCÓFAGO CENTRAL (350, 150, 200, 280) ---
-  const sarcGrad = ctx.createLinearGradient(350, 150, 550, 150);
+  // Gold sarcophagus with mask
+  const sarcGrad = ctx.createLinearGradient(350, 80, 550, 80);
   sarcGrad.addColorStop(0, '#2a2010');
   sarcGrad.addColorStop(0.5, '#3d3018');
   sarcGrad.addColorStop(1, '#2a2010');
   ctx.fillStyle = sarcGrad;
-  ctx.fillRect(355, 155, 190, 270);
-  ctx.strokeStyle = '#e8b84a';
+  ctx.fillRect(355, 85, 190, 180);
+  ctx.strokeStyle = '#d4a843';
   ctx.lineWidth = 2;
-  ctx.strokeRect(355, 155, 190, 270);
+  ctx.strokeRect(355, 85, 190, 180);
   ctx.lineWidth = 1;
-  // Máscara dourada
-  ctx.fillStyle = '#e8b84a88';
-  ctx.beginPath(); ctx.ellipse(450, 230, 35, 50, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#e8b84a';
-  ctx.beginPath(); ctx.ellipse(450, 230, 35, 50, 0, 0, Math.PI * 2); ctx.stroke();
-  // Olhos
+  // Mask
+  ctx.fillStyle = '#d4a84388';
+  ctx.beginPath(); ctx.ellipse(450, 155, 35, 50, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#d4a843';
+  ctx.beginPath(); ctx.ellipse(450, 155, 35, 50, 0, 0, Math.PI * 2); ctx.stroke();
   ctx.fillStyle = '#1565c0';
-  ctx.beginPath(); ctx.ellipse(438, 225, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(462, 225, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
-  // Nemes (toca faraônica)
-  ctx.strokeStyle = '#e8b84a';
-  ctx.beginPath(); ctx.moveTo(415, 190); ctx.lineTo(450, 175); ctx.lineTo(485, 190); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(438, 148, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(462, 148, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#d4a843';
+  ctx.beginPath(); ctx.moveTo(415, 115); ctx.lineTo(450, 100); ctx.lineTo(485, 115); ctx.stroke();
 
-  // --- PAINEL DE MECANISMO (100, 300, 180, 150) ---
-  ctx.fillStyle = '#14100a';
-  ctx.fillRect(105, 305, 170, 140);
-  ctx.strokeStyle = '#e8b84a';
+  // Central altar with 5 circular slots
+  ctx.fillStyle = '#1a1408';
+  ctx.fillRect(280, 320, 340, 140);
+  ctx.strokeStyle = '#d4a843';
   ctx.lineWidth = 2;
-  ctx.strokeRect(105, 305, 170, 140);
+  ctx.strokeRect(280, 320, 340, 140);
   ctx.lineWidth = 1;
-  ctx.fillStyle = '#e8b84a';
-  ctx.font = '9px Courier New';
-  ctx.fillText('MECANISMO', 145, 330);
-  // Engrenagens
-  ctx.strokeStyle = '#e8b84a88';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(160, 380, 20, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(210, 380, 15, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#d4a843';
+  ctx.font = '10px Georgia';
+  ctx.fillText('ALTAR DA CRIA\u00C7\u00C3O', 390, 345);
+  // 5 slots
+  for (let i = 0; i < 5; i++) {
+    const sx = 320 + i * 58;
+    ctx.strokeStyle = '#d4a84388';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx, 400, 18, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#0a0806';
+    ctx.beginPath(); ctx.arc(sx, 400, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 1;
+    // Slot number
+    ctx.fillStyle = '#d4a84344';
+    ctx.font = '8px Georgia';
+    ctx.fillText((i + 1).toString(), sx - 3, 430);
+  }
+
+  // Jewels in walls
+  const jewels = [
+    {x:200,y:200,c:'#d4a843'},{x:700,y:180,c:'#1565c0'},
+    {x:150,y:350,c:'#c62828'},{x:750,y:340,c:'#2e7d32'}
+  ];
+  for (const j of jewels) {
+    const jb = 0.4 + Math.sin(t / 1200 + j.x * 0.01) * 0.2;
+    ctx.fillStyle = j.c + '66';
+    ctx.beginPath(); ctx.arc(j.x, j.y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(212,164,67,${jb})`;
+    ctx.beginPath(); ctx.arc(j.x, j.y, 5, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // Cartouche
+  ctx.strokeStyle = '#d4a84366';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(450, 50, 60, 20, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#d4a84388';
+  ctx.font = '12px serif';
+  ctx.fillText('\u{1F3D4} \u{1F4A7} \u{1F331}', 420, 55);
   ctx.lineWidth = 1;
-  // Alavanca
-  ctx.fillStyle = '#3d3010';
-  ctx.fillRect(240, 350, 15, 70);
-  ctx.fillStyle = '#e8b84a';
-  ctx.beginPath(); ctx.arc(247, 345, 8, 0, Math.PI * 2); ctx.fill();
 
-  // --- TESOUROS (650, 250, 150, 180) ---
-  ctx.fillStyle = '#14100a';
-  ctx.fillRect(655, 255, 140, 170);
-  ctx.strokeStyle = '#e8b84a';
-  ctx.strokeRect(655, 255, 140, 170);
-  // Baú
-  ctx.fillStyle = '#3d2a10';
-  ctx.fillRect(680, 330, 90, 60);
-  ctx.strokeStyle = '#e8b84a';
-  ctx.strokeRect(680, 330, 90, 60);
-  // Ouro brilhante
-  ctx.fillStyle = '#e8b84a';
-  ctx.beginPath(); ctx.arc(705, 310, 6, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(730, 305, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(755, 310, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#8a7a50';
-  ctx.font = '8px Courier New';
-  ctx.fillText('TESOUROS', 690, 280);
+  // Fragment 3 (tábua de pedra)
+  if (!state.get('fragmento3')) {
+    ctx.fillStyle = '#1a1408';
+    ctx.fillRect(660, 420, 140, 60);
+    ctx.strokeStyle = '#3d3010';
+    ctx.strokeRect(660, 420, 140, 60);
+    ctx.fillStyle = '#8a7a50';
+    ctx.font = '8px Georgia';
+    ctx.fillText('t\u00E1bua de pedra', 680, 455);
+  }
 
-  // --- VOLTAR CORREDOR (30, 520, 130, 50) ---
+  // Back to Corredor
   ctx.fillStyle = '#14100a';
-  ctx.fillRect(35, 525, 125, 45);
+  ctx.fillRect(35, 535, 125, 40);
   ctx.strokeStyle = '#3d3010';
-  ctx.strokeRect(35, 525, 125, 45);
+  ctx.strokeRect(35, 535, 125, 40);
   ctx.fillStyle = '#8a7a50';
-  ctx.font = '10px Courier New';
-  ctx.fillText('← Corredor', 45, 552);
-}
+  ctx.font = '10px Georgia';
+  ctx.fillText('\u2190 Corredor', 50, 560);
 
-function renderCam_Atmosfera(ctx) {
-  // Brilho místico do sarcófago
-  ctx.save();
-  ctx.globalAlpha = 0.025;
-  ctx.fillStyle = '#e8b84a';
-  ctx.beginPath();
-  ctx.moveTo(450, 155); ctx.lineTo(350, 500); ctx.lineTo(550, 500);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
-
-function renderCam_Overlay(ctx) {
-  const vignette = ctx.createRadialGradient(450, 300, 100, 450, 300, 500);
-  vignette.addColorStop(0, 'transparent');
-  vignette.addColorStop(0.6, 'rgba(10, 8, 4, 0.3)');
-  vignette.addColorStop(1, 'rgba(10, 8, 4, 0.65)');
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, 900, 600);
-  ctx.fillStyle = 'rgba(15, 12, 5, 0.05)';
+  // Vignette
+  const vig3 = ctx.createRadialGradient(450, 300, 100, 450, 300, 500);
+  vig3.addColorStop(0, 'transparent');
+  vig3.addColorStop(0.6, 'rgba(10, 8, 4, 0.3)');
+  vig3.addColorStop(1, 'rgba(10, 8, 4, 0.65)');
+  ctx.fillStyle = vig3;
   ctx.fillRect(0, 0, 900, 600);
 }
 
 // ============ TABELA DE POSIÇÕES ============
 // Ambiente ANTECÂMARA:
-//   estela:          (100, 100, 130, 220)
-//   altar:           (350, 200, 200, 120)
-//   muralAnubis:     (650, 80, 150, 250)
-//   passagemCorredr: (380, 400, 140, 100)
-//   voltarSaida:     (30, 520, 120, 50)
+//   rosetta:         (55, 75, 190, 290)
+//   tocha:           (430, 85, 40, 80)
+//   fragmento1:      (375, 415, 150, 70)
+//   vasos:           (600, 410, 180, 70)
+//   passagemCorredor:(780, 195, 90, 215)
 //
 // Ambiente CORREDOR:
-//   armadilha:      (300, 250, 300, 100)
-//   relevo:         (250, 130, 400, 100)
-//   nicho:          (650, 200, 100, 150)
-//   portaCamara:    (400, 400, 100, 120)
-//   voltarAntecam:  (30, 520, 130, 50)
+//   muralEsq:       (45, 115, 150, 230)
+//   muralDir:       (705, 115, 150, 230)
+//   fragmento2:     (320, 85, 260, 30)
+//   tiles:          (220, 390, 460, 125)
+//   portaCamara:    (400, 390, 100, 130)
+//   voltarAnte:     (30, 530, 130, 45)
 //
 // Ambiente CÂMARA:
-//   sarcofago:      (350, 150, 200, 280)
-//   painelMecanismo:(100, 300, 180, 150)
-//   tesouros:       (650, 250, 150, 180)
-//   voltarCorredor: (30, 520, 130, 50)
+//   altar:          (275, 315, 350, 150)
+//   sarcofago:      (350, 80, 200, 190)
+//   fragmento3:     (655, 415, 150, 70)
+//   voltarCorredor: (30, 530, 130, 45)

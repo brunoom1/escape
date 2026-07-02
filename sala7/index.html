@@ -45,34 +45,52 @@
     const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a0806' });
     const input = EscapeInput.create(game.getCanvas(), 900, 600);
     const state = EscapeState.create({ ambiente: 'restaurante', flags: {
-      menu: false, garrafa: false, toalha: false, lustre: false, relogio: false, portaCabines: false,
-      cabine1: false, cabine2: false, cabine3: false, diario: false, maleta: false, chaveMestre: false,
-      codigoCabine: false, cabineAberta: false,
-      manometro: false, alavanca: false, carvao: false, mapa: false,
+      menu: false, garrafa: false, toalha: false, lustre: false, portaCabines: false,
+      cabine1: false, cabine2: false, cabine3: false, diario: false, chaveMestre: false,
+      cabineAberta: false, codigoCabine: false,
+      manometros: false, alavancas: false, fornalha: false,
       vagaoRestLocked: false, vagaoCabLocked: false
     }});
     const inv = EscapeInventory.create();
     const timer = EscapeTimer.create();
-    let parallaxOffset = 0;
 
     UITabs.create('tabs', [
       { id: 'restaurante', label: 'Vagão Restaurante', locked: false },
       { id: 'cabines', label: 'Vagão de Cabines', locked: true },
       { id: 'locomotiva', label: 'Locomotiva', locked: true }
     ], (tabId) => {
-      if (tabId === 'restaurante' && state.get('vagaoRestLocked')) { msg('O vagão restaurante foi desacoplado. Não há como voltar.'); UITabs.setActive('tabs', state.getAmbiente()); return; }
-      if (tabId === 'cabines' && !state.get('portaCabines')) { msg('A passagem para o vagão de cabines está trancada.'); UITabs.setActive('tabs', 'restaurante'); return; }
-      if (tabId === 'cabines' && state.get('vagaoCabLocked')) { msg('O vagão de cabines foi desacoplado. Não há como voltar.'); UITabs.setActive('tabs', state.getAmbiente()); return; }
-      if (tabId === 'locomotiva' && !state.get('chaveMestre')) { msg('A porta da locomotiva exige uma chave mestra.'); UITabs.setActive('tabs', 'cabines'); return; }
-      if (tabId === 'cabines' && !state.get('vagaoRestLocked')) { confirmarAvanco('restaurante', 'cabines'); return; }
-      if (tabId === 'locomotiva' && !state.get('vagaoCabLocked')) { confirmarAvanco('cabines', 'locomotiva'); return; }
-      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmb(tabId); });
+      if (tabId === 'restaurante' && state.get('vagaoRestLocked')) {
+        msg('O vagão restaurante foi desacoplado. Não há como voltar.');
+        UITabs.setActive('tabs', state.getAmbiente()); return;
+      }
+      if (tabId === 'cabines' && !state.get('portaCabines')) {
+        msg('A passagem para o vagão de cabines está trancada.');
+        UITabs.setActive('tabs', 'restaurante'); return;
+      }
+      if (tabId === 'cabines' && state.get('vagaoCabLocked')) {
+        msg('O vagão de cabines foi desacoplado. Não há como voltar.');
+        UITabs.setActive('tabs', state.getAmbiente()); return;
+      }
+      if (tabId === 'locomotiva' && !state.get('chaveMestre')) {
+        msg('A porta da locomotiva exige uma chave mestra.');
+        UITabs.setActive('tabs', 'cabines'); return;
+      }
+      if (tabId === 'cabines' && !state.get('vagaoRestLocked')) {
+        confirmarAvanco('restaurante', 'cabines'); return;
+      }
+      if (tabId === 'locomotiva' && !state.get('vagaoCabLocked')) {
+        confirmarAvanco('cabines', 'locomotiva'); return;
+      }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+        state.setAmbiente(tabId); msgAmb(tabId);
+      });
     });
 
     function confirmarAvanco(from, to) {
+      const nomeFrom = from === 'restaurante' ? 'Vagão Restaurante' : 'Vagão de Cabines';
       const html = `
-        <p style="color:#c62828; font-weight:bold; margin-bottom:14px; font-size:1.1rem;">⚠️ Atenção: ao avançar, o vagão anterior será desacoplado!</p>
-        <p style="color:${UITokens.get('colorText')}; margin-bottom:18px;">Você não poderá retornar ao ${from === 'restaurante' ? 'Vagão Restaurante' : 'Vagão de Cabines'}. Tem certeza?</p>
+        <p style="color:#c62828; font-weight:bold; margin-bottom:14px; font-size:1.1rem;">⚠️ Atenção: ao avançar, o vagão anterior será desacoplado permanentemente!</p>
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:18px;">Você não poderá retornar ao ${nomeFrom}. Tem certeza?</p>
         <div style="display:flex; gap:10px; justify-content:center;">
           <button id="btnConfirmar" style="padding:8px 20px; background:#1a150e; border:1px solid #c62828; color:#c62828; font-family:'Georgia',serif; cursor:pointer; border-radius:4px;">Avançar</button>
           <button id="btnCancelar" style="padding:8px 20px; background:#1a150e; border:1px solid #3d3020; color:#e8dcc8; font-family:'Georgia',serif; cursor:pointer; border-radius:4px;">Ficar</button>
@@ -81,15 +99,23 @@
       setTimeout(() => {
         document.getElementById('btnConfirmar').addEventListener('click', () => {
           UIPanel.hide('puzzle-panel');
-          if (from === 'restaurante') { state.set('vagaoRestLocked', true); }
-          else { state.set('vagaoCabLocked', true); }
-          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(to); UITabs.setActive('tabs', to); msgAmb(to); });
+          if (from === 'restaurante') state.set('vagaoRestLocked', true);
+          else state.set('vagaoCabLocked', true);
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+            state.setAmbiente(to); UITabs.setActive('tabs', to); msgAmb(to);
+          });
         });
-        document.getElementById('btnCancelar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); UITabs.setActive('tabs', from); msg('Você decide permanecer.'); });
+        document.getElementById('btnCancelar').addEventListener('click', () => {
+          UIPanel.hide('puzzle-panel'); UITabs.setActive('tabs', from);
+          msg('Você decide permanecer.');
+        });
       }, 50);
     }
 
-    UIMessageBox.create('message'); UIInventory.create('inventory'); UIPanel.create('puzzle-panel'); UISuccessOverlay.create('success-overlay');
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
     const dust = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(212,168,67,0.08)', count: 20, speedX: [-1,1], speedY: [-2,1], size: [1,2], life: [6,14] });
 
     function msg(t) { UIMessageBox.show('message', t); }
@@ -104,26 +130,23 @@
     // OBJETOS
     const objetosRestaurante = [
       { id: 'menu', x: 350, y: 300, w: 120, h: 80, label: 'Menu do jantar' },
-      { id: 'garrafa', x: 200, y: 280, w: 50, h: 100, label: 'Garrafa de vinho' },
-      { id: 'toalha', x: 550, y: 320, w: 100, h: 60, label: 'Toalha dobrada' },
+      { id: 'garrafa', x: 200, y: 270, w: 50, h: 110, label: 'Garrafa de vinho' },
+      { id: 'toalha', x: 550, y: 320, w: 100, h: 55, label: 'Toalha dobrada' },
       { id: 'lustre', x: 400, y: 20, w: 120, h: 70, label: 'Lustre de cristal' },
-      { id: 'relogio', x: 50, y: 80, w: 70, h: 100, label: 'Relógio de parede' },
       { id: 'portaCabines', x: 800, y: 180, w: 70, h: 250, label: 'Porta → Cabines' }
     ];
     const objetosCabines = [
-      { id: 'cabine1', x: 50, y: 150, w: 120, h: 180, label: 'Cabine 1 (aberta)' },
-      { id: 'cabine2', x: 220, y: 150, w: 120, h: 180, label: 'Cabine 2 (trancada)' },
-      { id: 'cabine3', x: 400, y: 150, w: 120, h: 180, label: 'Cabine 3 (aberta)' },
+      { id: 'cabine1', x: 80, y: 150, w: 140, h: 200, label: 'Cabine 1' },
+      { id: 'cabine2', x: 300, y: 150, w: 140, h: 200, label: 'Cabine 2 (trancada)' },
+      { id: 'cabine3', x: 520, y: 150, w: 140, h: 200, label: 'Cabine 3' },
       { id: 'diario', x: 80, y: 400, w: 80, h: 50, label: 'Diário no chão' },
-      { id: 'maleta', x: 430, y: 400, w: 90, h: 60, label: 'Maleta de couro' },
       { id: 'portaLocomotiva', x: 750, y: 180, w: 70, h: 250, label: 'Porta → Locomotiva' },
       { id: 'voltarRest', x: 30, y: 520, w: 140, h: 50, label: '← Restaurante' }
     ];
     const objetosLocomotiva = [
-      { id: 'manometro', x: 100, y: 50, w: 180, h: 120, label: 'Painel de manômetros' },
-      { id: 'alavancas', x: 350, y: 150, w: 200, h: 250, label: 'Alavancas de freio' },
-      { id: 'carvao', x: 700, y: 300, w: 130, h: 120, label: 'Fornalha de carvão' },
-      { id: 'mapa', x: 650, y: 50, w: 120, h: 80, label: 'Mapa ferroviário' },
+      { id: 'manometros', x: 100, y: 50, w: 310, h: 140, label: 'Painel de manômetros' },
+      { id: 'alavancas', x: 450, y: 150, w: 200, h: 270, label: 'Alavancas de freio' },
+      { id: 'fornalha', x: 700, y: 300, w: 130, h: 120, label: 'Fornalha' },
       { id: 'voltarCab', x: 30, y: 520, w: 140, h: 50, label: '← Cabines' }
     ];
     function getObjetos() {
@@ -138,111 +161,113 @@
       if (EscapeTransitions.isTransitioning()) return;
       const id = obj.id;
 
-      // VAGÃO RESTAURANTE
+      // RESTAURANTE
       if (id === 'menu') {
         if (!state.get('menu')) {
           state.set('menu', true);
-          inv.add('menu_jantar', '📋', 'Menu: Filet Mignon 28F, Vin Rouge 1934 15F, Crème Brûlée 7F');
-          msg('Menu elegante em francês. "Dîner Spécial": Filet Mignon — 28 Francs, Vin Rouge Château Margaux 1934 — 15 Francs, Crème Brûlée — 7 Francs.');
-        } else msg('Menu: Filet 28F, Vin Rouge 1934 15F, Crème Brûlée 7F.');
-      } else if (id === 'garrafa') {
+          inv.add('menu_jantar', '📋', 'Menu: Crème Brûlée 7F, Vin Rouge 15F, Filet Mignon 28F');
+          msg('Menu elegante em francês. "Dîner Spécial": Crème Brûlée — 7 Francs, Vin Rouge Château Margaux 1934 — 15 Francs, Filet Mignon — 28 Francs.');
+        } else msg('Menu: Crème 7F, Vin 15F, Filet 28F.');
+      }
+      else if (id === 'garrafa') {
         if (!state.get('garrafa')) {
           state.set('garrafa', true);
           inv.add('vinho_1934', '🍷', 'Château Margaux 1934 — safra especial');
           msg('Château Margaux, safra 1934. A garrafa está quase cheia. Alguém saiu às pressas no meio do jantar.');
         } else msg('Château Margaux 1934. Safra excelente.');
-      } else if (id === 'toalha') {
+      }
+      else if (id === 'toalha') {
         if (!state.get('toalha')) {
           state.set('toalha', true);
-          msg('Sob a toalha: uma nota escrita às pressas: "A passagem está no fim do corredor. Empurre e gire." A porta para os cabines!');
+          msg('Sob a toalha: uma nota escrita às pressas. "A passagem está no fim do corredor. Empurre e gire." A porta para os cabines!');
           state.set('portaCabines', true);
           UITabs.unlock('tabs', 'cabines');
         } else msg('A nota diz: "Empurre e gire." Passagem desbloqueada.');
-      } else if (id === 'lustre') {
+      }
+      else if (id === 'lustre') {
         if (!state.get('lustre')) {
           state.set('lustre', true);
-          msg('O lustre balança com o movimento do trem. Cristais art déco refletem luz dourada. Nada escondido, mas belo.');
+          msg('O lustre balança com o movimento do trem. Cristais art déco refletem luz dourada. Nada escondido, mas hipnotizante.');
         } else msg('Lustre de cristal art déco. O trem balança.');
-      } else if (id === 'relogio') {
-        if (!state.get('relogio')) {
-          state.set('relogio', true);
-          inv.add('hora_1147', '🕰️', 'Relógio: parado às 11:47');
-          msg('Relógio art déco parado às 11:47. O momento em que algo aconteceu ao maquinista.');
-        } else msg('Parado às 11:47.');
-      } else if (id === 'portaCabines') {
-        if (state.get('portaCabines')) { UITabs.setActive('tabs', 'cabines'); }
+      }
+      else if (id === 'portaCabines') {
+        if (state.get('portaCabines')) UITabs.setActive('tabs', 'cabines');
         else msg('A porta não cede. Deve haver um mecanismo.');
       }
 
-      // VAGÃO DE CABINES
+      // CABINES
       else if (id === 'cabine1') {
         if (!state.get('cabine1')) {
           state.set('cabine1', true);
-          msg('Cabine 1 vazia. Lençóis desarrumados. Alguém saiu correndo. Nada útil aqui.');
+          msg('Cabine 1 vazia. Lençóis desarrumados, alguém saiu correndo. Nada útil.');
         } else msg('Cabine 1. Vazia.');
-      } else if (id === 'cabine2') {
+      }
+      else if (id === 'cabine2') {
         if (!state.get('cabineAberta')) { abrirPainelCabine(); }
         else {
           if (!state.get('chaveMestre')) {
             state.set('chaveMestre', true);
             inv.add('chave_mestra', '🔑', 'Chave mestra do trem — acesso à locomotiva');
             UITabs.unlock('tabs', 'locomotiva');
-            msg('Dentro da cabine 2: uma chave mestra pendurada no espelho! Etiqueta: "LOCOMOTIVA". Acesso liberado!');
+            msg('Dentro da cabine 2: uma chave mestra pendurada no espelho! Etiqueta: "LOCOMOTIVA".');
           } else msg('Cabine 2 aberta. Chave mestra já coletada.');
         }
-      } else if (id === 'cabine3') {
+      }
+      else if (id === 'cabine3') {
         if (!state.get('cabine3')) {
           state.set('cabine3', true);
           msg('Cabine 3. Pertences de um passageiro rico. Roupas finas, mas nada que ajude a parar o trem.');
-        } else msg('Cabine 3. Roupas finas, nada útil.');
-      } else if (id === 'diario') {
+        } else msg('Cabine 3. Nada útil.');
+      }
+      else if (id === 'diario') {
         if (!state.get('diario')) {
           state.set('diario', true);
           inv.add('diario_eng', '📖', 'Diário do engenheiro: "nunca exceda o dobro do jantar"');
           msg('Diário do engenheiro-chefe: "Os freios devem ser calibrados com precisão. A regra é simples: nunca exceda o dobro do jantar. Cada alavanca tem seu valor certo."');
-        } else msg('Diário: "nunca exceda o dobro do jantar" — calibração dos freios.');
-      } else if (id === 'maleta') {
-        if (!state.get('maleta')) {
-          state.set('maleta', true);
-          inv.add('luvas', '🧤', 'Luvas de maquinista — proteção contra calor');
-          msg('Maleta de couro com iniciais "J.P." — dentro: luvas de maquinista pesadas. Para operar a fornalha.');
-        } else msg('Maleta vazia. Luvas já coletadas.');
-      } else if (id === 'portaLocomotiva') {
-        if (state.get('chaveMestre')) { UITabs.setActive('tabs', 'locomotiva'); }
+        } else msg('Diário: "nunca exceda o dobro do jantar."');
+      }
+      else if (id === 'portaLocomotiva') {
+        if (state.get('chaveMestre')) UITabs.setActive('tabs', 'locomotiva');
         else msg('Porta pesada de aço. Fechadura exige chave mestra.');
-      } else if (id === 'voltarRest') {
-        if (state.get('vagaoRestLocked')) { msg('O vagão restaurante foi desacoplado. Impossível retornar.'); }
-        else { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('restaurante'); UITabs.setActive('tabs', 'restaurante'); msg('De volta ao vagão restaurante.'); }); }
+      }
+      else if (id === 'voltarRest') {
+        if (state.get('vagaoRestLocked')) msg('O vagão restaurante foi desacoplado. Impossível retornar.');
+        else {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+            state.setAmbiente('restaurante'); UITabs.setActive('tabs', 'restaurante');
+            msg('De volta ao vagão restaurante.');
+          });
+        }
       }
 
       // LOCOMOTIVA
-      else if (id === 'manometro') {
-        if (!state.get('manometro')) {
-          state.set('manometro', true);
-          inv.add('info_psi', '🔧', 'Manômetros: 3 alavancas, escala 0-50 PSI cada');
-          msg('Painel com 3 manômetros circulares, escala 0-50 PSI. Cada um conectado a uma alavanca de freio. Precisam ser ajustados ao valor correto.');
-        } else msg('3 manômetros, 0-50 PSI cada. Valores corretos param o trem.');
-      } else if (id === 'alavancas') {
-        abrirPainelFreios();
-      } else if (id === 'carvao') {
-        if (!state.get('carvao')) {
-          state.set('carvao', true);
-          msg('A fornalha queima intensamente. Sem as luvas, impossível fechar a comporta. O fogo alimenta a caldeira.');
-        } else msg('Fornalha ardente. A caldeira mantém pressão.');
-      } else if (id === 'mapa') {
-        if (!state.get('mapa')) {
-          state.set('mapa', true);
-          inv.add('mapa_rota', '🗺️', 'Mapa: próxima estação em 12km — curva perigosa antes');
-          msg('Mapa ferroviário. Próxima estação: Innsbruck, 12km. ATENÇÃO: curva acentuada em 8km. Velocidade máxima na curva: 40km/h. O trem está a 120km/h!');
-        } else msg('Curva perigosa em 8km. Precisa frear AGORA.');
-      } else if (id === 'voltarCab') {
-        if (state.get('vagaoCabLocked')) { msg('O vagão de cabines foi desacoplado. Impossível retornar.'); }
-        else { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('cabines'); UITabs.setActive('tabs', 'cabines'); msg('De volta ao vagão de cabines.'); }); }
+      else if (id === 'manometros') {
+        if (!state.get('manometros')) {
+          state.set('manometros', true);
+          inv.add('info_psi', '🔧', 'Manômetros: 3 alavancas, escala 0–50 PSI cada');
+          msg('Painel com 3 manômetros circulares, escala 0–50 PSI. Cada um conectado a uma alavanca de freio. Precisam ser ajustados ao valor correto.');
+        } else msg('3 manômetros, 0–50 PSI cada.');
+      }
+      else if (id === 'alavancas') { abrirPainelFreios(); }
+      else if (id === 'fornalha') {
+        if (!state.get('fornalha')) {
+          state.set('fornalha', true);
+          msg('A fornalha queima intensamente. Carvão alimenta a caldeira. Sem controle aqui — os freios são a solução.');
+        } else msg('Fornalha ardente. Os freios são a solução.');
+      }
+      else if (id === 'voltarCab') {
+        if (state.get('vagaoCabLocked')) msg('O vagão de cabines foi desacoplado. Impossível retornar.');
+        else {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+            state.setAmbiente('cabines'); UITabs.setActive('tabs', 'cabines');
+            msg('De volta ao vagão de cabines.');
+          });
+        }
       }
       UIInventory.render('inventory', inv.getAll());
     }
 
-    // PUZZLE CABINE 2 — código 934 (últimos 3 dígitos da safra 1934)
+    // PUZZLE CABINE 2 — código 934 (últimos 3 dígitos do ano 1934 da garrafa)
     function abrirPainelCabine() {
       const html = `
         <p style="color:${UITokens.get('colorText')}; margin-bottom:14px;">🔐 Cabine 2 — Fechadura com código de 3 dígitos</p>
@@ -258,24 +283,34 @@
         document.getElementById('btnAbrir').addEventListener('click', () => {
           const v = document.getElementById('codCabine').value.trim();
           if (v === '934') {
-            state.set('cabineAberta', true); state.set('codigoCabine', true); UIPanel.hide('puzzle-panel');
+            state.set('cabineAberta', true);
+            state.set('codigoCabine', true);
             state.set('chaveMestre', true);
             inv.add('chave_mestra', '🔑', 'Chave mestra do trem — acesso à locomotiva');
             UITabs.unlock('tabs', 'locomotiva');
+            UIPanel.hide('puzzle-panel');
             UIInventory.render('inventory', inv.getAll());
-            msg('✅ Clique! A fechadura cede. Dentro: uma chave mestra dourada pendurada no espelho! Etiqueta: "LOCOMOTIVA".');
-          } else { msg('❌ O mecanismo resiste. Código incorreto.'); document.getElementById('codCabine').value = ''; document.getElementById('codCabine').focus(); }
+            msg('Clique! A fechadura cede. Dentro: uma chave mestra dourada pendurada no espelho! Etiqueta: "LOCOMOTIVA".');
+          } else {
+            msg('O mecanismo resiste. Código incorreto.');
+            document.getElementById('codCabine').value = '';
+            document.getElementById('codCabine').focus();
+          }
         });
-        document.getElementById('btnVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta da cabine 2.'); });
-        document.getElementById('codCabine').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('btnAbrir').click(); });
+        document.getElementById('btnVoltar').addEventListener('click', () => {
+          UIPanel.hide('puzzle-panel'); msg('Você se afasta da cabine 2.');
+        });
+        document.getElementById('codCabine').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') document.getElementById('btnAbrir').click();
+        });
       }, 50);
     }
 
-    // PUZZLE FINAL — Alavancas de freio: 7, 15, 28 PSI (ordem crescente)
+    // PUZZLE FINAL — Alavancas: 7, 15, 28 PSI (preços do menu em ordem crescente)
     function abrirPainelFreios() {
       const html = `
-        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🚂 Alavancas de Freio — Ajuste a pressão (0-50 PSI)</p>
-        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:14px;">Três alavancas controlam os freios. Cada uma precisa do valor exato de PSI. Ordem crescente.</p>
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🚂 Alavancas de Freio — Ajuste a pressão (0–50 PSI)</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:14px;">Três alavancas controlam os freios. Cada uma precisa do valor exato de PSI.</p>
         <div style="display:flex; flex-direction:column; gap:12px; margin:14px 0; align-items:center;">
           <label style="color:#e8dcc8; display:flex; align-items:center; gap:10px;">Alavanca 1: <input type="number" id="lev1" min="0" max="50" value="0" style="background:#12100a; border:1px solid #3d3020; color:#d4a843; font-family:'Georgia',serif; font-size:1.2rem; padding:8px; width:80px; text-align:center; border-radius:4px;"> PSI</label>
           <label style="color:#e8dcc8; display:flex; align-items:center; gap:10px;">Alavanca 2: <input type="number" id="lev2" min="0" max="50" value="0" style="background:#12100a; border:1px solid #3d3020; color:#d4a843; font-family:'Georgia',serif; font-size:1.2rem; padding:8px; width:80px; text-align:center; border-radius:4px;"> PSI</label>
@@ -293,32 +328,54 @@
           const v3 = parseInt(document.getElementById('lev3').value) || 0;
           if (v1 === 7 && v2 === 15 && v3 === 28) {
             UIPanel.hide('puzzle-panel'); timer.stop();
-            UISuccessOverlay.show('success-overlay', { title: '🚂 O TREM FREIA!', subtitle: 'As alavancas travam na posição. O chiado dos freios ecoa pelos trilhos. O Orient Express desacelera suavemente antes da curva. Você salvou todos a bordo.', time: timer.format(), links: [{ text: '← Voltar ao Lobby', href: '../index.html' }] });
-          } else { msg('❌ Pressão incorreta! O trem treme mas não desacelera. Os manômetros voltam a zero. Tente novamente.'); }
+            UISuccessOverlay.show('success-overlay', {
+              title: '🚂 O TREM FREIA!',
+              subtitle: 'As alavancas travam na posição. O chiado dos freios ecoa pelos trilhos. O Orient Express desacelera suavemente antes da curva. Você salvou todos a bordo.',
+              time: timer.format(),
+              links: [{ text: '← Voltar ao Lobby', href: '../index.html' }]
+            });
+          } else {
+            msg('Pressão incorreta! O trem treme mas não desacelera. Os manômetros voltam a zero.');
+          }
         });
-        document.getElementById('btnCancelarF').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta das alavancas.'); });
+        document.getElementById('btnCancelarF').addEventListener('click', () => {
+          UIPanel.hide('puzzle-panel'); msg('Você se afasta das alavancas.');
+        });
       }, 50);
     }
 
     // INPUT
-    input.onClick((x, y) => { if (EscapeTransitions.isTransitioning()) return; const obj = input.hitTest(x, y, getObjetos()); if (obj) interagir(obj); });
+    input.onClick((x, y) => {
+      if (EscapeTransitions.isTransitioning()) return;
+      const obj = input.hitTest(x, y, getObjetos());
+      if (obj) interagir(obj);
+    });
 
-    // RENDER
+    // RENDER LOOP
     game.onRender((ctx, dt, size) => {
-      parallaxOffset += dt * 60;
       const amb = state.getAmbiente();
       if (amb === 'restaurante') renderRestaurante(ctx, state);
       else if (amb === 'cabines') renderCabines(ctx, state);
       else renderLocomotiva(ctx, state);
+
       const hovered = input.getHoveredObject(getObjetos());
-      for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
+      for (const obj of getObjetos()) {
+        if (hovered && hovered.id === obj.id) {
+          ctx.save();
+          ctx.strokeStyle = UITokens.get('glowColor');
+          ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor');
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+          ctx.restore();
+        }
+      }
       dust.update(dt); dust.render(ctx);
       EscapeTransitions.render(ctx, size.width, size.height);
     });
 
-    // Render functions are loaded from render.js
-
-    game.start(); UIInventory.render('inventory', inv.getAll());
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
   </script>
 </body>
 </html>
