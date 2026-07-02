@@ -49,6 +49,7 @@
   <script src="../ui-kit/components/message-box.js"></script>
   <script src="../ui-kit/components/panel.js"></script>
   <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
 
   <script>
     UITokens.apply(ThemeSciFi);
@@ -212,79 +213,16 @@
     // RENDER
     game.onRender((ctx, dt, size) => {
       const amb = state.getAmbiente();
-      if (amb === 'comando') renderComando(ctx);
-      else if (amb === 'energia') renderEnergia(ctx);
-      else renderCapsula(ctx);
+      if (amb === 'comando') renderComando(ctx, state);
+      else if (amb === 'energia') renderEnergia(ctx, state);
+      else renderCapsula(ctx, state);
       const hovered = input.getHoveredObject(getObjetos());
       for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
       stars.update(dt); stars.render(ctx);
       EscapeTransitions.render(ctx, size.width, size.height);
     });
 
-    function renderComando(ctx) {
-      ctx.fillStyle = '#0a1020'; ctx.fillRect(0, 0, 900, 600);
-      // Janela com estrelas
-      ctx.fillStyle = '#000005'; ctx.fillRect(55, 65, 170, 190); ctx.strokeStyle = '#1a3a5a'; ctx.lineWidth = 3; ctx.strokeRect(55, 65, 170, 190);
-      ctx.fillStyle = '#fff'; for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.arc(70+Math.random()*140, 80+Math.random()*160, 1, 0, Math.PI*2); ctx.fill(); }
-      ctx.fillStyle = '#ffffaa'; ctx.beginPath(); ctx.arc(140, 140, 8, 0, Math.PI*2); ctx.fill(); // Estrela principal
-      ctx.lineWidth = 1;
-      // Terminal
-      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(305, 55, 190, 120); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(305, 55, 190, 120);
-      ctx.fillStyle = '#001a2a'; ctx.fillRect(310, 60, 180, 100);
-      ctx.fillStyle = '#00d4ff'; ctx.font = '10px monospace'; ctx.fillText('STATION OS v7.1', 320, 80); ctx.fillText('> EMERGENCY MODE', 320, 95); ctx.fillText('> SYSTEMS OFFLINE', 320, 110);
-      // Mapa
-      ctx.fillStyle = '#0a1520'; ctx.fillRect(605, 45, 140, 110); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(605, 45, 140, 110);
-      ctx.fillStyle = '#00d4ff44'; ctx.font = '9px monospace'; ctx.fillText('CMD → ENG → CAP', 620, 100);
-      // Cadeira
-      ctx.fillStyle = '#1a1a2a'; ctx.fillRect(385, 305, 130, 110); ctx.strokeStyle = '#2a2a4a'; ctx.strokeRect(385, 305, 130, 110);
-      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('CAP. TORRES', 405, 365);
-      // Porta energia
-      ctx.fillStyle = '#0a0a14'; ctx.fillRect(785, 255, 65, 175); ctx.strokeStyle = state.get('cartaoColetado') ? '#00d4ff' : '#1a3a5a'; ctx.strokeRect(785, 255, 65, 175);
-      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('ENG →', 795, 345);
-    }
-
-    function renderEnergia(ctx) {
-      ctx.fillStyle = '#080c14'; ctx.fillRect(0, 0, 900, 600);
-      const pulse = state.get('energiaRestaurada') ? 0 : Math.sin(Date.now()/600)*0.15;
-      ctx.fillStyle = `rgba(255,100,0,${pulse})`; ctx.fillRect(0, 0, 900, 5);
-      // Painel fusíveis
-      ctx.fillStyle = '#0a1520'; ctx.fillRect(305, 55, 240, 140); ctx.strokeStyle = '#1a3a5a'; ctx.lineWidth = 2; ctx.strokeRect(305, 55, 240, 140);
-      for (let i = 0; i < 5; i++) { ctx.fillStyle = (i===2 && !state.get('energiaRestaurada')) ? '#2a0a0a' : '#0a2a1a'; ctx.fillRect(320+i*44, 80, 35, 80); ctx.strokeStyle = (i===2 && !state.get('energiaRestaurada')) ? '#c62828' : '#2e7d32'; ctx.strokeRect(320+i*44, 80, 35, 80); }
-      ctx.lineWidth = 1;
-      // Gerador
-      ctx.fillStyle = '#0a0a14'; ctx.fillRect(65, 155, 170, 190); ctx.strokeStyle = state.get('energiaRestaurada') ? '#00d4ff' : '#333'; ctx.strokeRect(65, 155, 170, 190);
-      ctx.fillStyle = state.get('energiaRestaurada') ? '#00d4ff' : '#4a4a4a'; ctx.font = '12px monospace'; ctx.fillText(state.get('energiaRestaurada') ? 'ONLINE' : 'OFFLINE', 110, 255);
-      // Armário
-      ctx.fillStyle = '#1a1a2a'; ctx.fillRect(655, 105, 110, 170); ctx.strokeStyle = '#2a3a5a'; ctx.strokeRect(655, 105, 110, 170);
-      // Duto
-      ctx.fillStyle = '#0a0a10'; ctx.fillRect(405, 405, 190, 90); ctx.strokeStyle = '#1a2a3a'; ctx.strokeRect(405, 405, 190, 90);
-      ctx.fillStyle = '#333'; ctx.fillRect(420, 430, 160, 8); ctx.fillRect(420, 450, 160, 8); ctx.fillRect(420, 470, 160, 8);
-      // Portas
-      ctx.fillStyle = '#0a0a14'; ctx.fillRect(35, 455, 95, 95); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(35, 455, 95, 95);
-      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('← CMD', 52, 505);
-      ctx.fillStyle = '#0a0a14'; ctx.fillRect(785, 305, 65, 145); ctx.strokeStyle = state.get('energiaRestaurada') ? '#00d4ff' : '#1a3a5a'; ctx.strokeRect(785, 305, 65, 145);
-      ctx.fillStyle = '#4a7a9a'; ctx.fillText('CAP →', 795, 380);
-    }
-
-    function renderCapsula(ctx) {
-      ctx.fillStyle = '#050810'; ctx.fillRect(0, 0, 900, 600);
-      // Painel ignição
-      ctx.fillStyle = '#0a1520'; ctx.fillRect(255, 65, 390, 170); ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2; ctx.strokeRect(255, 65, 390, 170);
-      ctx.fillStyle = '#00d4ff'; ctx.font = '13px monospace'; ctx.fillText('PAINEL DE IGNIÇÃO', 370, 95);
-      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace';
-      ctx.fillText('[ 1: ___ ] → [ 2: ___ ] → [ 3: ___ ] → [ 4: ___ ]', 285, 150);
-      ctx.lineWidth = 1;
-      // Visor
-      ctx.fillStyle = '#000008'; ctx.fillRect(55, 85, 145, 140); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(55, 85, 145, 140);
-      ctx.fillStyle = '#ffffaa'; ctx.beginPath(); ctx.arc(127, 155, 5, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#00d4ff44'; ctx.font = '8px monospace'; ctx.fillText('PROXIMA CENTAURI', 70, 210);
-      // Manual
-      ctx.fillStyle = '#1a1510'; ctx.fillRect(705, 305, 110, 90); ctx.strokeStyle = '#3a3020'; ctx.strokeRect(705, 305, 110, 90);
-      ctx.fillStyle = '#b8a888'; ctx.font = '10px monospace'; ctx.fillText('MANUAL', 735, 345); ctx.fillText('CAP. 7', 740, 360);
-      // Voltar
-      ctx.fillStyle = '#0a1020'; ctx.fillRect(35, 485, 115, 55); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(35, 485, 115, 55);
-      ctx.fillStyle = '#4a7a9a'; ctx.font = '11px monospace'; ctx.fillText('← Energia', 52, 517);
-    }
+    // Render functions are loaded from render.js
 
     game.start();
     UIInventory.render('inventory', inv.getAll());

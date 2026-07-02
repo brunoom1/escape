@@ -38,6 +38,7 @@
   <script src="../ui-kit/components/message-box.js"></script>
   <script src="../ui-kit/components/panel.js"></script>
   <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
   <script>
     UITokens.apply(ThemeMuseum);
     const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a0a0f' });
@@ -295,9 +296,9 @@
     game.onRender((ctx, dt, size) => {
       laserPulse += dt * 3;
       const amb = state.getAmbiente();
-      if (amb === 'galeria') renderGaleria(ctx);
-      else if (amb === 'seguranca') renderSeguranca(ctx);
-      else renderEgipcia(ctx);
+      if (amb === 'galeria') renderGaleria(ctx, state);
+      else if (amb === 'seguranca') renderSeguranca(ctx, state);
+      else renderEgipcia(ctx, state);
 
       const hovered = input.getHoveredObject(getObjetos());
       for (const obj of getObjetos()) {
@@ -311,182 +312,7 @@
       EscapeTransitions.render(ctx, size.width, size.height);
     });
 
-    // === RENDER GALERIA ===
-    function renderGaleria(ctx) {
-      ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, 900, 600);
-      // Piso de mármore
-      ctx.fillStyle = '#15131a'; ctx.fillRect(0, 500, 900, 100);
-      for (let i = 0; i < 10; i++) { ctx.strokeStyle = '#1e1a25'; ctx.beginPath(); ctx.moveTo(i*90, 500); ctx.lineTo(i*90, 600); ctx.stroke(); }
-      // Paredes
-      ctx.fillStyle = '#12101a'; ctx.fillRect(0, 0, 900, 500);
-      ctx.strokeStyle = '#2a2035'; ctx.beginPath(); ctx.moveTo(0, 500); ctx.lineTo(900, 500); ctx.stroke();
-
-      // Quadro Moderno (1889)
-      ctx.fillStyle = '#1a1828'; ctx.fillRect(65, 55, 150, 190);
-      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 3; ctx.strokeRect(65, 55, 150, 190); ctx.lineWidth = 1;
-      // Vitrine glow
-      ctx.fillStyle = 'rgba(232,184,74,0.08)'; ctx.fillRect(55, 45, 170, 210);
-      ctx.fillStyle = '#1a237e'; ctx.fillRect(75, 65, 130, 130);
-      ctx.fillStyle = '#ffeb3b'; for (let i=0;i<8;i++){ctx.beginPath();ctx.arc(90+i*16, 100+Math.sin(i)*20, 3, 0, Math.PI*2);ctx.fill();}
-      ctx.fillStyle = '#d4cfc0'; ctx.font = '10px Georgia'; ctx.fillText('1889', 125, 235);
-
-      // Quadro Clássico (1893)
-      ctx.fillStyle = '#1a1828'; ctx.fillRect(365, 55, 150, 190);
-      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 3; ctx.strokeRect(365, 55, 150, 190); ctx.lineWidth = 1;
-      ctx.fillStyle = 'rgba(232,184,74,0.08)'; ctx.fillRect(355, 45, 170, 210);
-      ctx.fillStyle = '#ff6f00'; ctx.fillRect(375, 65, 130, 130);
-      ctx.fillStyle = '#263238'; ctx.beginPath(); ctx.ellipse(440, 120, 20, 30, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#d4cfc0'; ctx.font = '10px Georgia'; ctx.fillText('1893', 425, 235);
-
-      // Escultura
-      ctx.fillStyle = '#2a2535'; ctx.fillRect(700, 280, 60, 40); // pedestal
-      ctx.fillStyle = '#3a3545'; ctx.beginPath(); ctx.ellipse(730, 200, 30, 80, 0, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#4a4555'; ctx.beginPath(); ctx.ellipse(730, 200, 30, 80, 0, 0, Math.PI*2); ctx.stroke();
-
-      // Placa informativa
-      ctx.fillStyle = '#1a1a12'; ctx.fillRect(255, 385, 130, 50);
-      ctx.strokeStyle = '#3a3a2a'; ctx.strokeRect(255, 385, 130, 50);
-      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('INFORMAÇÕES', 278, 415);
-
-      // Porta segurança
-      ctx.fillStyle = '#1a1520'; ctx.fillRect(755, 405, 110, 140);
-      ctx.strokeStyle = state.get('crachaColetado') ? '#4caf50' : '#2a2035'; ctx.lineWidth = 2; ctx.strokeRect(755, 405, 110, 140); ctx.lineWidth = 1;
-      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('SEGURANÇA', 775, 480);
-
-      // Corredor egípcio
-      ctx.fillStyle = '#0e0c08'; ctx.fillRect(35, 425, 120, 120);
-      ctx.strokeStyle = state.get('laserDesativado') ? '#4caf50' : '#c62828'; ctx.lineWidth = 2; ctx.strokeRect(35, 425, 120, 120); ctx.lineWidth = 1;
-      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('ALA EGÍPCIA', 50, 490);
-
-      // LASERS (se ativos)
-      if (!state.get('laserDesativado')) { renderLasers(ctx); }
-    }
-
-    // === RENDER LASERS ===
-    function renderLasers(ctx) {
-      const alpha = 0.5 + 0.3 * Math.sin(laserPulse);
-      ctx.save();
-      ctx.strokeStyle = `rgba(255, 26, 26, ${alpha})`;
-      ctx.shadowColor = 'rgba(255, 26, 26, 0.8)';
-      ctx.shadowBlur = 8;
-      ctx.lineWidth = 2;
-      // Laser A — bloqueia escultura
-      ctx.beginPath(); ctx.moveTo(650, 130); ctx.lineTo(800, 130); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(660, 300); ctx.lineTo(800, 300); ctx.stroke();
-      // Laser B — bloqueia corredor egípcio
-      ctx.beginPath(); ctx.moveTo(20, 420); ctx.lineTo(170, 420); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(20, 550); ctx.lineTo(170, 550); ctx.stroke();
-      // Laser C — decorativo / ambiência
-      ctx.beginPath(); ctx.moveTo(550, 350); ctx.lineTo(550, 500); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(300, 300); ctx.lineTo(550, 300); ctx.stroke();
-      ctx.restore();
-    }
-
-    // === RENDER SEGURANÇA ===
-    function renderSeguranca(ctx) {
-      ctx.fillStyle = '#0e0c14'; ctx.fillRect(0, 0, 900, 600);
-      // Piso
-      ctx.fillStyle = '#0a0812'; ctx.fillRect(0, 520, 900, 80);
-      ctx.strokeStyle = '#1a1525'; ctx.beginPath(); ctx.moveTo(0, 520); ctx.lineTo(900, 520); ctx.stroke();
-
-      // Diagrama de circuito
-      ctx.fillStyle = '#0a0a0f'; ctx.fillRect(55, 55, 240, 190);
-      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 2; ctx.strokeRect(55, 55, 240, 190); ctx.lineWidth = 1;
-      ctx.fillStyle = '#e8b84a'; ctx.font = '11px monospace'; ctx.fillText('DIAGRAMA DE CIRCUITO', 85, 80);
-      // Desenha nodos
-      const nodos = [{x:100,y:120,l:'S1'},{x:200,y:120,l:'S3'},{x:200,y:200,l:'S2'},{x:100,y:200,l:'S4'}];
-      nodos.forEach(n => { ctx.fillStyle='#1a0a0a'; ctx.beginPath(); ctx.arc(n.x,n.y,15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#ff1a1a'; ctx.beginPath(); ctx.arc(n.x,n.y,15,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='#ff1a1a'; ctx.font='10px monospace'; ctx.fillText(n.l,n.x-8,n.y+4); });
-      // Setas de dependência
-      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(115,120); ctx.lineTo(185,120); ctx.stroke(); // S1→S3
-      ctx.beginPath(); ctx.moveTo(200,135); ctx.lineTo(200,185); ctx.stroke(); // S3→S2
-      ctx.beginPath(); ctx.moveTo(185,200); ctx.lineTo(115,200); ctx.stroke(); // S2→S4
-      // Pontas de seta
-      ctx.fillStyle = '#e8b84a';
-      ctx.beginPath(); ctx.moveTo(185,117); ctx.lineTo(180,120); ctx.lineTo(185,123); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(197,185); ctx.lineTo(200,180); ctx.lineTo(203,185); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(115,197); ctx.lineTo(120,200); ctx.lineTo(115,203); ctx.fill();
-
-      // Monitores
-      ctx.fillStyle = '#050510'; ctx.fillRect(405, 55, 190, 140);
-      ctx.strokeStyle = '#2a2035'; ctx.strokeRect(405, 55, 190, 140);
-      for (let i = 0; i < 4; i++) { ctx.fillStyle = '#0a1510'; ctx.fillRect(415+i*45, 65, 40, 55); ctx.strokeStyle = '#1a3a2a'; ctx.strokeRect(415+i*45, 65, 40, 55); }
-      ctx.fillStyle = '#4caf50'; ctx.font = '8px monospace';
-      ctx.fillText('CAM1', 420, 110); ctx.fillText('CAM2', 465, 110); ctx.fillText('CAM3', 510, 110); ctx.fillText('CAM4', 555, 110);
-      ctx.fillStyle = state.get('laserDesativado') ? '#4caf50' : '#ff1a1a'; ctx.font = '10px monospace';
-      ctx.fillText(state.get('laserDesativado') ? 'LASERS: OFF' : 'LASERS: ATIVOS', 440, 180);
-
-      // Painel sensores
-      ctx.fillStyle = '#0a0a12'; ctx.fillRect(355, 325, 190, 130);
-      ctx.strokeStyle = state.get('laserDesativado') ? '#4caf50' : '#ff1a1a'; ctx.lineWidth = 2; ctx.strokeRect(355, 325, 190, 130); ctx.lineWidth = 1;
-      ctx.fillStyle = '#d4cfc0'; ctx.font = '11px monospace'; ctx.fillText('PAINEL SENSORES', 388, 355);
-      // Status dos sensores
-      const sensores = ['sensor1','sensor2','sensor3','sensor4'];
-      sensores.forEach((s, i) => {
-        ctx.fillStyle = state.get(s) ? '#4caf50' : '#ff1a1a';
-        ctx.beginPath(); ctx.arc(385+i*40, 400, 8, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#d4cfc0'; ctx.font = '8px monospace'; ctx.fillText('S'+(i+1), 380+i*40, 425);
-      });
-
-      // Voltar
-      ctx.fillStyle = '#12101a'; ctx.fillRect(35, 525, 125, 45);
-      ctx.strokeStyle = '#2a2035'; ctx.strokeRect(35, 525, 125, 45);
-      ctx.fillStyle = '#7a7060'; ctx.font = '11px Georgia'; ctx.fillText('← Galeria', 60, 552);
-    }
-
-    // === RENDER ALA EGÍPCIA ===
-    function renderEgipcia(ctx) {
-      ctx.fillStyle = '#0c0a06'; ctx.fillRect(0, 0, 900, 600);
-      // Piso areia
-      ctx.fillStyle = '#1a1508'; ctx.fillRect(0, 480, 900, 120);
-      ctx.strokeStyle = '#2a2010'; ctx.beginPath(); ctx.moveTo(0, 480); ctx.lineTo(900, 480); ctx.stroke();
-      // Paredes hieróglifos background
-      ctx.fillStyle = '#0e0c06'; ctx.fillRect(0, 0, 900, 480);
-
-      // Sarcófago
-      ctx.fillStyle = '#1a1505'; ctx.fillRect(90, 110, 130, 230);
-      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 2; ctx.strokeRect(90, 110, 130, 230);
-      // Detalhes dourados
-      ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(155, 150, 25, 35, 0, 0, Math.PI*2); ctx.stroke(); // rosto
-      ctx.beginPath(); ctx.moveTo(120, 200); ctx.lineTo(190, 200); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(120, 250); ctx.lineTo(190, 250); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(120, 300); ctx.lineTo(190, 300); ctx.stroke();
-      ctx.fillStyle = '#e8b84a'; ctx.font = '9px Georgia'; ctx.fillText('SARCÓFAGO', 112, 355);
-
-      // Hieróglifos na parede
-      ctx.fillStyle = '#12100a'; ctx.fillRect(355, 85, 190, 170);
-      ctx.strokeStyle = '#3a3020'; ctx.strokeRect(355, 85, 190, 170);
-      // Símbolos
-      ctx.fillStyle = '#c9a84c'; ctx.font = '18px serif';
-      ctx.fillText('𓂀 𓃭 𓅃', 380, 125);
-      ctx.fillText('𓊝 𓋴 𓌳', 380, 160);
-      ctx.fillText('𓏏 𓐍 𓂋', 380, 195);
-      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('HIERÓGLIFOS', 400, 245);
-
-      // Mural de cores
-      ctx.fillStyle = '#12100a'; ctx.fillRect(655, 105, 140, 150);
-      ctx.strokeStyle = '#3a3020'; ctx.strokeRect(655, 105, 140, 150);
-      // Três círculos de cor
-      ctx.fillStyle = '#e8b84a'; ctx.beginPath(); ctx.arc(690, 165, 18, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#1565c0'; ctx.beginPath(); ctx.arc(725, 165, 18, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(760, 165, 18, 0, Math.PI*2); ctx.fill();
-      // Escaravelho abaixo
-      ctx.fillStyle = '#c9a84c'; ctx.font = '22px serif'; ctx.fillText('🪲', 713, 225);
-      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('MURAL RITUAL', 680, 250);
-
-      // Terminal override
-      ctx.fillStyle = '#0a0a12'; ctx.fillRect(355, 385, 190, 110);
-      ctx.strokeStyle = state.get('overrideCompleto') ? '#4caf50' : '#e8b84a'; ctx.lineWidth = 2; ctx.strokeRect(355, 385, 190, 110); ctx.lineWidth = 1;
-      ctx.fillStyle = state.get('overrideCompleto') ? '#4caf50' : '#e8b84a'; ctx.font = '11px monospace';
-      ctx.fillText(state.get('overrideCompleto') ? '✅ DESBLOQUEADO' : '⚡ OVERRIDE', 395, 440);
-      ctx.fillStyle = '#7a7060'; ctx.font = '9px monospace'; ctx.fillText('CODE: ____  CORES: _ _ _', 370, 470);
-
-      // Voltar
-      ctx.fillStyle = '#12100a'; ctx.fillRect(35, 525, 125, 45);
-      ctx.strokeStyle = '#3a3020'; ctx.strokeRect(35, 525, 125, 45);
-      ctx.fillStyle = '#7a7060'; ctx.font = '11px Georgia'; ctx.fillText('← Galeria', 60, 552);
-    }
+    // Render functions are loaded from render.js
 
     game.start(); UIInventory.render('inventory', inv.getAll());
   </script>

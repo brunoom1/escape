@@ -38,6 +38,7 @@
   <script src="../ui-kit/components/message-box.js"></script>
   <script src="../ui-kit/components/panel.js"></script>
   <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
 
   <script>
     UITokens.apply(ThemeArtDeco);
@@ -306,16 +307,21 @@
     game.onRender((ctx, dt, size) => {
       parallaxOffset += dt * 60;
       const amb = state.getAmbiente();
-      if (amb === 'restaurante') renderRestaurante(ctx);
-      else if (amb === 'cabines') renderCabines(ctx);
-      else renderLocomotiva(ctx);
+      if (amb === 'restaurante') renderRestaurante(ctx, state);
+      else if (amb === 'cabines') renderCabines(ctx, state);
+      else renderLocomotiva(ctx, state);
       const hovered = input.getHoveredObject(getObjetos());
       for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
       dust.update(dt); dust.render(ctx);
       EscapeTransitions.render(ctx, size.width, size.height);
     });
 
-    function drawWindow(ctx, x, y, w, h) {
+    // Render functions are loaded from render.js
+
+    game.start(); UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>
       // Parallax landscape through window
       ctx.save();
       ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();

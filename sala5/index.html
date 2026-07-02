@@ -38,6 +38,7 @@
   <script src="../ui-kit/components/message-box.js"></script>
   <script src="../ui-kit/components/panel.js"></script>
   <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
   <script>
     UITokens.apply(ThemeSubmarine);
     const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a1628' });
@@ -141,7 +142,7 @@
 
     game.onRender((ctx, dt, size) => {
       const amb = state.getAmbiente();
-      if (amb === 'proa') renderProa(ctx); else renderMaquinas(ctx);
+      if (amb === 'proa') renderProa(ctx, state); else renderMaquinas(ctx, state);
       const hovered = input.getHoveredObject(getObjetos());
       for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
       // Água subindo
@@ -151,58 +152,7 @@
       EscapeTransitions.render(ctx, size.width, size.height);
     });
 
-    function renderProa(ctx) {
-      ctx.fillStyle = '#0e1e35'; ctx.fillRect(0, 0, 900, 600);
-      // Casco metálico
-      ctx.strokeStyle = '#1a3a5a'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(0, 120*i); ctx.lineTo(900, 120*i); ctx.stroke(); }
-      // Rebites
-      for (let i = 0; i < 20; i++) { ctx.fillStyle = '#2a4a6a'; ctx.beginPath(); ctx.arc(50+i*45, 20, 3, 0, Math.PI*2); ctx.fill(); }
-      // Periscópio
-      ctx.fillStyle = '#1a2a3a'; ctx.fillRect(420, 35, 40, 140); ctx.fillStyle = '#2a4a6a'; ctx.fillRect(410, 35, 60, 20);
-      // Mesa navegação
-      ctx.fillStyle = '#1a2a1a'; ctx.fillRect(105, 155, 190, 110); ctx.strokeStyle = '#2a4a3a'; ctx.strokeRect(105, 155, 190, 110);
-      ctx.fillStyle = '#4a7a5a'; ctx.font = '9px monospace'; ctx.fillText('CARTA NÁUTICA', 140, 200);
-      // Armário
-      ctx.fillStyle = '#1a1a2a'; ctx.fillRect(655, 105, 110, 190); ctx.strokeStyle = '#3a3a5a'; ctx.strokeRect(655, 105, 110, 190);
-      // Manual
-      ctx.fillStyle = '#2a2a1a'; ctx.fillRect(155, 355, 110, 70); ctx.strokeStyle = '#5a5a3a'; ctx.strokeRect(155, 355, 110, 70);
-      ctx.fillStyle = '#aaa'; ctx.font = '9px monospace'; ctx.fillText('MANUAL EMERG.', 163, 395);
-      // Painel comm
-      ctx.fillStyle = '#0a1520'; ctx.fillRect(605, 355, 140, 90); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(605, 355, 140, 90);
-      ctx.fillStyle = '#4fc3f7'; ctx.font = '9px monospace'; ctx.fillText('147.3 MHz', 635, 405);
-      // Escotilha
-      ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(820, 460, 40, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = state.get('chaveColetada') ? '#4fc3f7' : '#333'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(820, 460, 40, 0, Math.PI*2); ctx.stroke(); ctx.lineWidth = 1;
-    }
-
-    function renderMaquinas(ctx) {
-      ctx.fillStyle = '#0c1a2e'; ctx.fillRect(0, 0, 900, 600);
-      // Tubulações
-      ctx.strokeStyle = '#2a4a6a'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(150, 230); ctx.lineTo(150, 320); ctx.lineTo(750, 320); ctx.lineTo(750, 230); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(350, 230); ctx.lineTo(350, 320); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(550, 230); ctx.lineTo(550, 320); ctx.stroke(); ctx.lineWidth = 1;
-      // Válvulas
-      const valvulas = [{x:100,y:100,cor:'#1565c0',label:'AZUL'},{x:300,y:100,cor:'#c62828',label:'VERM'},{x:500,y:100,cor:'#f9a825',label:'AMAR'}];
-      valvulas.forEach(v => {
-        ctx.fillStyle = '#0a1a2a'; ctx.fillRect(v.x, v.y, 100, 120); ctx.strokeStyle = v.cor; ctx.lineWidth = 2; ctx.strokeRect(v.x, v.y, 100, 120);
-        ctx.beginPath(); ctx.arc(v.x+50, v.y+50, 25, 0, Math.PI*2); ctx.strokeStyle = v.cor; ctx.stroke();
-        ctx.fillStyle = v.cor; ctx.font = '10px monospace'; ctx.fillText(v.label, v.x+35, v.y+110); ctx.lineWidth = 1;
-      });
-      // Painel gerador
-      ctx.fillStyle = '#0a2a1a'; ctx.fillRect(355, 325, 190, 90); ctx.strokeStyle = state.get('geradorAtivo') ? '#00ff88' : '#1a3a5a'; ctx.lineWidth = 2; ctx.strokeRect(355, 325, 190, 90);
-      ctx.fillStyle = state.get('geradorAtivo') ? '#00ff88' : '#4a7a9a'; ctx.font = '12px monospace'; ctx.fillText(state.get('geradorAtivo') ? 'ONLINE' : 'OFFLINE', 410, 375); ctx.lineWidth = 1;
-      // Rádio
-      ctx.fillStyle = '#1a1a0a'; ctx.fillRect(685, 125, 120, 110); ctx.strokeStyle = '#3a3a2a'; ctx.strokeRect(685, 125, 120, 110);
-      ctx.fillStyle = '#4fc3f7'; ctx.font = '9px monospace'; ctx.fillText('RADIO EMERG.', 700, 185);
-      // Escotilha fuga
-      ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(760, 465, 50, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = state.get('geradorAtivo') ? '#00ff88' : '#333'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(760, 465, 50, 0, Math.PI*2); ctx.stroke(); ctx.lineWidth = 1;
-      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('FUGA', 742, 470);
-      // Voltar
-      ctx.fillStyle = '#0e1e35'; ctx.fillRect(35, 505, 115, 45); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(35, 505, 115, 45);
-      ctx.fillStyle = '#4a7a9a'; ctx.font = '11px monospace'; ctx.fillText('← Proa', 60, 532);
-    }
+    // Render functions are loaded from render.js
 
     game.start(); UIInventory.render('inventory', inv.getAll());
   </script>

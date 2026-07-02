@@ -14,14 +14,27 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: flex-start;
       padding: 16px;
       gap: 12px;
     }
     #tabs { width: 100%; max-width: 910px; }
-    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
-    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #1b5e20; cursor: crosshair; }
+    #game-wrapper {
+      position: relative;
+      width: 900px;
+      max-width: 100%;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+      border: 1px solid #1b5e20;
+      cursor: crosshair;
+    }
     #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
-    #message, #inventory { width: 100%; max-width: 910px; }
+    #message { width: 100%; max-width: 910px; }
+    #inventory { width: 100%; max-width: 910px; }
   </style>
 </head>
 <body>
@@ -34,6 +47,7 @@
   <div id="message"></div>
   <div id="inventory"></div>
 
+  <!-- Lib -->
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -42,6 +56,8 @@
   <script src="../lib/timer.js"></script>
   <script src="../lib/events.js"></script>
   <script src="../lib/particles.js"></script>
+
+  <!-- UI Kit -->
   <script src="../ui-kit/tokens.js"></script>
   <script src="../ui-kit/themes/lab.js"></script>
   <script src="../ui-kit/components/inventory.js"></script>
@@ -50,8 +66,13 @@
   <script src="../ui-kit/components/panel.js"></script>
   <script src="../ui-kit/components/success-overlay.js"></script>
 
+  <!-- Render cinematográfico -->
+  <script src="render.js"></script>
+
   <script>
+    // ============ SETUP ============
     UITokens.apply(ThemeLab);
+
     const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a0f0a' });
     const input = EscapeInput.create(game.getCanvas(), 900, 600);
     const state = EscapeState.create({ ambiente: 'lab', flags: {
@@ -59,42 +80,55 @@
       clipboard: false, crachaColetado: false, alarmeDesligado: false,
       visor: false, manual: false, tubos: false,
       reagente1: false, reagente2: false, reagente3: false, reagente4: false, reagente5: false,
-      refrigerador: false, tabelaPeriodica: false, cofreAberto: false
+      refrigerador: false, tabelaPeriodica: false
     }});
     const inv = EscapeInventory.create();
     const timer = EscapeTimer.create();
     const bus = EscapeEvents.create();
 
+    // UI Components
     UITabs.create('tabs', [
       { id: 'lab', label: 'Laboratório', locked: false },
       { id: 'contencao', label: 'Contenção', locked: true },
       { id: 'deposito', label: 'Depósito', locked: true }
     ], (tabId) => {
       if (tabId === 'contencao' && !state.get('crachaColetado')) {
-        msg('⚠️ Acesso restrito. Nível de segurança 3 necessário.'); UITabs.setActive('tabs', 'lab'); return;
+        msg('⚠️ Acesso restrito. Nível de segurança 3 necessário.');
+        UITabs.setActive('tabs', 'lab');
+        return;
       }
       if (tabId === 'deposito' && !state.get('alarmeDesligado')) {
-        msg('⚠️ Alarme ativo. Portas do depósito seladas.'); UITabs.setActive('tabs', 'lab'); return;
+        msg('⚠️ Alarme ativo. Portas do depósito seladas.');
+        UITabs.setActive('tabs', 'lab');
+        return;
       }
-      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmbiente(tabId); });
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+        state.setAmbiente(tabId);
+        msgAmbiente(tabId);
+      });
     });
+
     UIMessageBox.create('message');
     UIInventory.create('inventory');
     UIPanel.create('puzzle-panel');
     UISuccessOverlay.create('success-overlay');
 
-    const vapor = EscapeParticles.create({ x: 0, y: 400, width: 900, height: 200, color: 'rgba(0,255,100,0.08)', count: 20, speedX: [-2,2], speedY: [-8,-2], size: [2,4], life: [3,7] });
+    const vapor = EscapeParticles.create({
+      x: 0, y: 400, width: 900, height: 200,
+      color: 'rgba(0, 255, 100, 0.08)',
+      count: 20, speedX: [-2, 2], speedY: [-8, -2], size: [2, 4], life: [3, 7]
+    });
 
-    function msg(t) { UIMessageBox.show('message', t); }
+    function msg(text) { UIMessageBox.show('message', text); }
     function msgAmbiente(a) {
-      if (a === 'lab') msg('Laboratório Helix. Luzes de emergência piscam. O alarme ecoa.');
-      else if (a === 'contencao') msg('Câmara de contenção BSL-3. O painel de purificação aguarda a sequência de reagentes.');
-      else msg('Depósito refrigerado. Prateleiras de reagentes sob luz fria. Vapores de condensação.');
+      if (a === 'lab') msg('Laboratório Helix. Luzes de emergência piscam. O alarme ecoa nas paredes metálicas.');
+      else if (a === 'contencao') msg('Câmara de contenção BSL-3. Luz UV esteriliza o ambiente. O painel de purificação aguarda a sequência.');
+      else msg('Depósito refrigerado. Prateleiras de reagentes sob luz fluorescente. Vapores de condensação no ar.');
     }
-    msg('⚠️ ALERTA: Vazamento detectado no Laboratório Helix. Sistema de ventilação selou todas as saídas. Encontre o antídoto.');
+    msg('⚠️ ALERTA: Vazamento detectado no Laboratório Helix. Sistema de ventilação selou todas as saídas. Neutralize a toxina para escapar.');
     timer.start();
 
-    // OBJETOS
+    // ============ OBJETOS (posições da POSITION TABLE) ============
     const objetosLab = [
       { id: 'computador', x: 350, y: 50, w: 160, h: 120, label: 'Computador central' },
       { id: 'microscopio', x: 60, y: 100, w: 100, h: 100, label: 'Microscópio' },
@@ -104,6 +138,7 @@
       { id: 'portaContencao', x: 780, y: 300, w: 70, h: 160, label: 'Porta → Contenção' },
       { id: 'portaDeposito', x: 50, y: 440, w: 100, h: 120, label: 'Porta → Depósito' },
     ];
+
     const objetosContencao = [
       { id: 'painelPurif', x: 250, y: 80, w: 400, h: 150, label: 'Painel de Purificação' },
       { id: 'visor', x: 60, y: 100, w: 130, h: 130, label: 'Visor de contenção' },
@@ -111,16 +146,18 @@
       { id: 'tubos', x: 350, y: 350, w: 200, h: 80, label: 'Tubos de exaustão' },
       { id: 'voltarLab1', x: 50, y: 500, w: 120, h: 50, label: '← Voltar' },
     ];
+
     const objetosDeposito = [
-      { id: 'reagente1', x: 60, y: 80, w: 80, h: 100, label: 'R-01 (azul)' },
-      { id: 'reagente2', x: 170, y: 80, w: 80, h: 100, label: 'R-02 (vermelho)' },
-      { id: 'reagente3', x: 280, y: 80, w: 80, h: 100, label: 'R-03 (verde)' },
-      { id: 'reagente4', x: 390, y: 80, w: 80, h: 100, label: 'R-04 (amarelo)' },
-      { id: 'reagente5', x: 500, y: 80, w: 80, h: 100, label: 'R-05 (roxo)' },
+      { id: 'reagente1', x: 60, y: 80, w: 80, h: 100, label: 'Frasco R-01' },
+      { id: 'reagente2', x: 170, y: 80, w: 80, h: 100, label: 'Frasco R-02' },
+      { id: 'reagente3', x: 280, y: 80, w: 80, h: 100, label: 'Frasco R-03' },
+      { id: 'reagente4', x: 390, y: 80, w: 80, h: 100, label: 'Frasco R-04' },
+      { id: 'reagente5', x: 500, y: 80, w: 80, h: 100, label: 'Frasco R-05' },
       { id: 'refrigerador', x: 650, y: 100, w: 120, h: 180, label: 'Refrigerador' },
       { id: 'tabelaPeriodica', x: 650, y: 350, w: 150, h: 100, label: 'Tabela periódica' },
       { id: 'voltarLab2', x: 50, y: 500, w: 120, h: 50, label: '← Voltar' },
     ];
+
     function getObjetos() {
       const a = state.getAmbiente();
       if (a === 'lab') return objetosLab;
@@ -128,86 +165,235 @@
       return objetosDeposito;
     }
 
-    // INTERAÇÕES
+    // ============ INTERAÇÕES ============
     function interagir(obj) {
       if (EscapeTransitions.isTransitioning()) return;
       const id = obj.id;
-      // LAB
+
+      // -- LABORATÓRIO PRINCIPAL --
       if (id === 'computador') {
-        if (!state.get('computador')) { state.set('computador', true); inv.add('formula', '💻', 'Fórmula: ácido → catalisador → base → oxidante'); msg('Tela: "Fórmula de neutralização: ácido (pH<3) → catalisador (pH 7) → base (pH>12) → oxidante. SEQUÊNCIA CRÍTICA."'); }
-        else msg('Fórmula: ácido → catalisador → base → oxidante.');
+        if (!state.get('computador')) {
+          state.set('computador', true);
+          inv.add('formula', '💻', 'Fórmula: tipos na ordem ácido→catalisador→base→oxidante');
+          msg('Tela: "Protocolo de neutralização: aplicar reagentes por tipo — ácido (pH<3) → catalisador (pH neutro) → base (pH>12) → oxidante. SEQUÊNCIA CRÍTICA."');
+        } else {
+          msg('Fórmula: tipos na ordem ácido → catalisador → base → oxidante.');
+        }
       } else if (id === 'microscopio') {
-        if (!state.get('microscopio')) { state.set('microscopio', true); inv.add('amostra', '🔬', 'Toxina reage a pH extremos'); msg('Amostra da toxina no microscópio. A estrutura molecular se decompõe em pH extremos. Precisa de ácido e base na sequência.'); }
-        else msg('A toxina se decompõe em pH extremos.');
+        if (!state.get('microscopio')) {
+          state.set('microscopio', true);
+          inv.add('amostra', '🔬', 'Toxina reage a pH extremos');
+          msg('Amostra da toxina no microscópio. A estrutura molecular se decompõe em pH extremos — precisa de ácido e base na sequência correta.');
+        } else {
+          msg('A toxina se decompõe com ácido e base aplicados na ordem.');
+        }
       } else if (id === 'centrifuga') {
-        if (!state.get('centrifuga')) { state.set('centrifuga', true); msg('A centrífuga contém uma amostra separada. O catalisador deve ser neutro (pH 7.0) para não reagir prematuramente.'); inv.add('centrifuga_nota', '⚗️', 'Catalisador: pH neutro (7.0)'); }
-        else msg('Catalisador deve ser pH 7.0.');
+        if (!state.get('centrifuga')) {
+          state.set('centrifuga', true);
+          inv.add('centrifuga_nota', '⚗️', 'Catalisador deve ser pH neutro (7.0)');
+          msg('Centrífuga com amostra separada. Resultado: o catalisador precisa ser neutro (pH 7.0) para não reagir prematuramente com o ácido.');
+        } else {
+          msg('Catalisador deve ser pH 7.0 — neutro.');
+        }
       } else if (id === 'painelAlarme') {
-        if (!state.get('alarmeDesligado')) {
-          if (inv.has('codigo_alarme')) { state.set('alarmeDesligado', true); UITabs.unlock('tabs', 'deposito'); msg('✅ Alarme desligado! Portas do depósito desbloqueadas.'); }
-          else msg('Painel exige código de 3 dígitos. Onde encontrar o código?');
-        } else msg('Alarme já desligado.');
+        abrirPainelAlarme();
       } else if (id === 'clipboard') {
-        if (!state.get('clipboard')) { state.set('clipboard', true); inv.add('cracha', '🪪', 'Crachá nível 3'); inv.add('codigo_alarme', '🔢', 'Código alarme: 274'); state.set('crachaColetado', true); UITabs.unlock('tabs', 'contencao'); msg('Atrás do clipboard: crachá de segurança nível 3 e post-it: "Alarme: 274". Contenção desbloqueada!'); }
-        else msg('Crachá nível 3 + código 274.');
+        if (!state.get('clipboard')) {
+          state.set('clipboard', true);
+          state.set('crachaColetado', true);
+          inv.add('cracha', '🪪', 'Crachá de acesso nível 3');
+          inv.add('codigo_alarme', '🔢', 'Post-it com código de 3 dígitos');
+          UITabs.unlock('tabs', 'contencao');
+          msg('Atrás do clipboard: crachá de segurança nível 3 e um post-it com um código de 3 dígitos. Porta da contenção desbloqueada!');
+        } else {
+          msg('Crachá nível 3 coletado. Post-it com código de 3 dígitos.');
+        }
       } else if (id === 'portaContencao') {
-        if (state.get('crachaColetado')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('contencao'); UITabs.setActive('tabs', 'contencao'); msgAmbiente('contencao'); }); }
-        else msg('Acesso restrito. Precisa de crachá nível 3.');
+        if (state.get('crachaColetado')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+            state.setAmbiente('contencao');
+            UITabs.setActive('tabs', 'contencao');
+            msgAmbiente('contencao');
+          });
+        } else {
+          msg('Acesso restrito. Um leitor de crachá pisca vermelho. Precisa de autorização nível 3.');
+        }
       } else if (id === 'portaDeposito') {
-        if (state.get('alarmeDesligado')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('deposito'); UITabs.setActive('tabs', 'deposito'); msgAmbiente('deposito'); }); }
-        else msg('Portas seladas. Desative o alarme primeiro.');
+        if (state.get('alarmeDesligado')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+            state.setAmbiente('deposito');
+            UITabs.setActive('tabs', 'deposito');
+            msgAmbiente('deposito');
+          });
+        } else {
+          msg('Portas seladas pelo sistema de alarme. Desative o alarme primeiro.');
+        }
       }
 
-      // CONTENÇÃO
-      else if (id === 'painelPurif') { abrirPainelPurificacao(); }
-      else if (id === 'visor') {
-        if (!state.get('visor')) { state.set('visor', true); msg('Visor mostra a toxina ativa. Cor esverdeada. O antídoto precisa neutralizar em 4 etapas progressivas.'); }
-        else msg('Toxina ativa. 4 etapas de neutralização.');
+      // -- CÂMARA DE CONTENÇÃO --
+      else if (id === 'painelPurif') {
+        abrirPainelPurificacao();
+      } else if (id === 'visor') {
+        if (!state.get('visor')) {
+          state.set('visor', true);
+          msg('Visor mostra a toxina ativa — cor esverdeada pulsante. O antídoto precisa neutralizá-la em 4 etapas progressivas.');
+        } else {
+          msg('Toxina ativa. Requer neutralização em 4 etapas.');
+        }
       } else if (id === 'manual') {
-        if (!state.get('manual')) { state.set('manual', true); inv.add('manual_nota', '📋', 'Ordem: ácido antes de base'); msg('Manual: "Protocolo de purificação: aplicar ácido ANTES da base. Catalisador no meio acelera reação. Oxidante finaliza."'); }
-        else msg('Ácido antes de base. Catalisador no meio. Oxidante finaliza.');
+        if (!state.get('manual')) {
+          state.set('manual', true);
+          inv.add('manual_nota', '📋', 'Protocolo: ácido antes de base, catalisador no meio');
+          msg('Manual de Protocolos BSL-3: "Purificação: aplicar ácido ANTES da base. Catalisador no meio acelera a reação. Oxidante finaliza o processo."');
+        } else {
+          msg('Protocolo: ácido antes de base. Catalisador no meio. Oxidante finaliza.');
+        }
       } else if (id === 'tubos') {
-        if (!state.get('tubos')) { state.set('tubos', true); msg('Tubos de exaustão indicam temperatura máxima: 78°C. Reagentes acima disso são incompatíveis.'); inv.add('temp_nota', '🌡️', 'Temp. máx: 78°C'); }
-        else msg('Temperatura máxima: 78°C.');
+        if (!state.get('tubos')) {
+          state.set('tubos', true);
+          inv.add('temp_nota', '🌡️', 'Temp. máx exaustão: 78°C');
+          msg('Tubos de exaustão indicam temperatura máxima suportada: 78°C. Reagentes acima disso podem ser incompatíveis com o sistema.');
+        } else {
+          msg('Temperatura máxima do sistema: 78°C.');
+        }
       } else if (id === 'voltarLab1') {
-        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('lab'); UITabs.setActive('tabs', 'lab'); msg('De volta ao laboratório.'); });
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+          state.setAmbiente('lab');
+          UITabs.setActive('tabs', 'lab');
+          msg('De volta ao laboratório principal.');
+        });
       }
-      // DEPÓSITO
+
+      // -- DEPÓSITO DE REAGENTES --
       else if (id === 'reagente1') {
-        if (!state.get('reagente1')) { state.set('reagente1', true); msg('R-01 (azul): NaCl-X | pH 2.1 | Ácido forte | Ponto ebulição: 78°C'); inv.add('r01', '🔵', 'R-01: pH 2.1, ácido, 78°C'); }
-        else msg('R-01: pH 2.1, ácido, 78°C.');
+        if (!state.get('reagente1')) {
+          state.set('reagente1', true);
+          inv.add('r01', '🔵', 'R-01: pH 2.1 | NaCl-X | 78°C');
+          msg('R-01 (azul): NaCl-X | pH 2.1 | Classificação: ácido forte | Ponto de ebulição: 78°C');
+        } else {
+          msg('R-01: pH 2.1, ácido forte, 78°C.');
+        }
       } else if (id === 'reagente2') {
-        if (!state.get('reagente2')) { state.set('reagente2', true); msg('R-02 (vermelho): FeO-7 | pH 7.0 | Catalisador orgânico | 120°C'); inv.add('r02', '🔴', 'R-02: pH 7.0, catalisador, 120°C'); }
-        else msg('R-02: pH 7.0, catalisador, 120°C.');
+        if (!state.get('reagente2')) {
+          state.set('reagente2', true);
+          inv.add('r02', '🔴', 'R-02: pH 7.0 | FeO-7 | 120°C');
+          msg('R-02 (vermelho): FeO-7 | pH 7.0 | Classificação: catalisador orgânico | Ponto de ebulição: 120°C');
+        } else {
+          msg('R-02: pH 7.0, catalisador, 120°C.');
+        }
       } else if (id === 'reagente3') {
-        if (!state.get('reagente3')) { state.set('reagente3', true); msg('R-03 (verde): CaB-3 | pH 12.4 | Base forte | 65°C'); inv.add('r03', '🟢', 'R-03: pH 12.4, base, 65°C'); }
-        else msg('R-03: pH 12.4, base, 65°C.');
+        if (!state.get('reagente3')) {
+          state.set('reagente3', true);
+          inv.add('r03', '🟢', 'R-03: pH 12.4 | CaB-3 | 65°C');
+          msg('R-03 (verde): CaB-3 | pH 12.4 | Classificação: base forte | Ponto de ebulição: 65°C');
+        } else {
+          msg('R-03: pH 12.4, base forte, 65°C.');
+        }
       } else if (id === 'reagente4') {
-        if (!state.get('reagente4')) { state.set('reagente4', true); msg('R-04 (amarelo): H2S-9 | pH 4.5 | Ácido fraco | 37°C'); inv.add('r04', '🟡', 'R-04: pH 4.5, ácido fraco, 37°C'); }
-        else msg('R-04: pH 4.5, ácido fraco, 37°C.');
+        if (!state.get('reagente4')) {
+          state.set('reagente4', true);
+          inv.add('r04', '🟡', 'R-04: pH 4.5 | H2S-9 | 37°C');
+          msg('R-04 (amarelo): H2S-9 | pH 4.5 | Classificação: ácido fraco | Ponto de ebulição: 37°C');
+        } else {
+          msg('R-04: pH 4.5, ácido fraco, 37°C.');
+        }
       } else if (id === 'reagente5') {
-        if (!state.get('reagente5')) { state.set('reagente5', true); msg('R-05 (roxo): KMn-4 | Oxidante | pH 6.8 | 50°C | Incompatível com ácidos fortes'); inv.add('r05', '🟣', 'R-05: oxidante, pH 6.8, 50°C'); }
-        else msg('R-05: oxidante, pH 6.8, incompatível com ácidos fortes.');
+        if (!state.get('reagente5')) {
+          state.set('reagente5', true);
+          inv.add('r05', '🟣', 'R-05: oxidante | KMn-4 | 50°C');
+          msg('R-05 (roxo): KMn-4 | Classificação: oxidante | pH 6.8 | Ponto de ebulição: 50°C | Nota: incompatível com ácidos diretos');
+        } else {
+          msg('R-05: oxidante, pH 6.8, 50°C.');
+        }
       } else if (id === 'refrigerador') {
-        if (!state.get('refrigerador')) { state.set('refrigerador', true); msg('Refrigerador vazio. Um post-it: "Amostra transferida para centrífuga — Lab principal."'); }
-        else msg('Vazio. Amostra na centrífuga.');
+        if (!state.get('refrigerador')) {
+          state.set('refrigerador', true);
+          msg('Refrigerador vazio. Post-it interno: "Amostra transferida para centrífuga — Lab principal." Temperatura: -4°C.');
+        } else {
+          msg('Vazio. Amostra na centrífuga do lab.');
+        }
       } else if (id === 'tabelaPeriodica') {
-        if (!state.get('tabelaPeriodica')) { state.set('tabelaPeriodica', true); msg('Tabela periódica com destaque: KMn (manganês) circulado. Nota: "oxidante universal — finaliza qualquer reação."'); }
-        else msg('KMn: oxidante universal, finaliza reações.');
+        if (!state.get('tabelaPeriodica')) {
+          state.set('tabelaPeriodica', true);
+          msg('Tabela periódica com destaque em KMn (manganês) circulado. Anotação: "oxidante universal — finaliza qualquer cadeia reativa."');
+        } else {
+          msg('KMn: oxidante universal, finalizador de reações.');
+        }
       } else if (id === 'voltarLab2') {
-        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('lab'); UITabs.setActive('tabs', 'lab'); msg('De volta ao laboratório.'); });
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+          state.setAmbiente('lab');
+          UITabs.setActive('tabs', 'lab');
+          msg('De volta ao laboratório principal.');
+        });
       }
+
+      // Atualizar inventário visual
       UIInventory.render('inventory', inv.getAll());
     }
 
-    // PUZZLE: Painel de Purificação — sequência correta: R-01(ácido) → R-02(catalisador) → R-03(base) → R-05(oxidante)
-    let painelAberto = false;
+    // ============ PUZZLE: PAINEL DE ALARME (código 274) ============
+    let painelAlarmeAberto = false;
+
+    function abrirPainelAlarme() {
+      if (state.get('alarmeDesligado')) {
+        msg('Alarme já desligado. Sistema estável.');
+        return;
+      }
+      painelAlarmeAberto = true;
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🔴 Painel de Alarme — Código de desativação (3 dígitos)</p>
+        <input type="text" id="alarmeInput" maxlength="3" placeholder="_ _ _"
+          style="background:#0a0a0a; border:1px solid #c62828; color:#ef5350; font-family:'Courier New'; font-size:1.5rem; padding:10px; width:120px; text-align:center; border-radius:4px;">
+        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+          <button id="btnAlarme" style="padding:8px 20px; background:#0f1a12; border:1px solid #1b5e20; color:#c8e6c9; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Inserir</button>
+          <button id="btnAlarmeVoltar" style="padding:8px 20px; background:#0f1a12; border:1px solid #1b5e20; color:#c8e6c9; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>
+      `;
+      UIPanel.setContent('puzzle-panel', html);
+      UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('alarmeInput').focus();
+        document.getElementById('btnAlarme').addEventListener('click', tentarAlarme);
+        document.getElementById('btnAlarmeVoltar').addEventListener('click', fecharAlarme);
+        document.getElementById('alarmeInput').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') tentarAlarme();
+        });
+      }, 50);
+      msg('Painel de alarme. Teclado numérico exige código de 3 dígitos para desativação.');
+    }
+
+    function tentarAlarme() {
+      const el = document.getElementById('alarmeInput');
+      if (!el) return;
+      const valor = el.value.trim();
+      if (valor === '274') {
+        state.set('alarmeDesligado', true);
+        painelAlarmeAberto = false;
+        UIPanel.hide('puzzle-panel');
+        UITabs.unlock('tabs', 'deposito');
+        msg('✅ Alarme desativado! Portas do depósito desbloqueadas. O silêncio toma conta do laboratório.');
+      } else {
+        msg('❌ Código incorreto. O alarme continua pulsando.');
+        el.value = '';
+        el.focus();
+      }
+    }
+
+    function fecharAlarme() {
+      painelAlarmeAberto = false;
+      UIPanel.hide('puzzle-panel');
+      msg('Você se afasta do painel de alarme.');
+    }
+
+    // ============ PUZZLE: PAINEL DE PURIFICAÇÃO (R-01→R-02→R-03→R-05) ============
+    let painelPurifAberto = false;
     let sequencia = [];
     const SEQUENCIA_CORRETA = ['r01', 'r02', 'r03', 'r05'];
     const reagenteNomes = { r01: '🔵 R-01', r02: '🔴 R-02', r03: '🟢 R-03', r04: '🟡 R-04', r05: '🟣 R-05' };
 
     function abrirPainelPurificacao() {
-      painelAberto = true; sequencia = [];
+      painelPurifAberto = true;
+      sequencia = [];
       const html = `
         <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🧪 Painel de Purificação — Selecione 4 reagentes na ordem correta</p>
         <div id="seq-display" style="font-size:1.3rem; margin:10px 0; min-height:30px; color:${UITokens.get('colorAccent')};">—</div>
@@ -222,124 +408,99 @@
           <button id="btnConfirm" style="padding:8px 20px; background:#0f1a12; border:1px solid #1b5e20; color:#c8e6c9; font-family:monospace; cursor:pointer; border-radius:4px;">Confirmar</button>
           <button id="btnReset" style="padding:8px 20px; background:#0f1a12; border:1px solid #1b5e20; color:#c8e6c9; font-family:monospace; cursor:pointer; border-radius:4px;">Limpar</button>
           <button id="btnBack" style="padding:8px 20px; background:#0f1a12; border:1px solid #1b5e20; color:#c8e6c9; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
-        </div>`;
+        </div>
+      `;
       UIPanel.setContent('puzzle-panel', html);
       UIPanel.show('puzzle-panel');
       setTimeout(() => {
-        document.querySelectorAll('.rbtn').forEach(b => b.addEventListener('click', () => { if (sequencia.length < 4) { sequencia.push(b.dataset.r); document.getElementById('seq-display').textContent = sequencia.map(r => reagenteNomes[r]).join(' → '); } }));
+        document.querySelectorAll('.rbtn').forEach(b => {
+          b.addEventListener('click', () => {
+            if (sequencia.length < 4) {
+              sequencia.push(b.dataset.r);
+              document.getElementById('seq-display').textContent = sequencia.map(r => reagenteNomes[r]).join(' → ');
+            }
+          });
+        });
         document.getElementById('btnConfirm').addEventListener('click', confirmarSequencia);
-        document.getElementById('btnReset').addEventListener('click', () => { sequencia = []; document.getElementById('seq-display').textContent = '—'; });
-        document.getElementById('btnBack').addEventListener('click', () => { painelAberto = false; UIPanel.hide('puzzle-panel'); msg('Você se afasta do painel.'); });
+        document.getElementById('btnReset').addEventListener('click', () => {
+          sequencia = [];
+          document.getElementById('seq-display').textContent = '—';
+        });
+        document.getElementById('btnBack').addEventListener('click', () => {
+          painelPurifAberto = false;
+          UIPanel.hide('puzzle-panel');
+          msg('Você se afasta do painel de purificação.');
+        });
       }, 50);
+      msg('Painel de Purificação ativo. Selecione os 4 reagentes na sequência correta para neutralizar a toxina.');
     }
 
     function confirmarSequencia() {
-      if (sequencia.length !== 4) { msg('Selecione exatamente 4 reagentes.'); return; }
+      if (sequencia.length !== 4) {
+        msg('Selecione exatamente 4 reagentes.');
+        return;
+      }
       if (JSON.stringify(sequencia) === JSON.stringify(SEQUENCIA_CORRETA)) {
-        painelAberto = false; UIPanel.hide('puzzle-panel'); timer.stop();
+        painelPurifAberto = false;
+        UIPanel.hide('puzzle-panel');
+        timer.stop();
         UISuccessOverlay.show('success-overlay', {
           title: '🎉 PROTOCOLO OMEGA COMPLETO!',
-          subtitle: 'O antídoto neutralizou a toxina. Portas desbloqueadas. Você salvou o laboratório.',
+          subtitle: 'O antídoto neutralizou a toxina. Sistema de ventilação reativado. Você salvou o laboratório.',
           time: timer.format(),
           links: [{ text: '← Voltar ao Lobby', href: '../index.html' }]
         });
       } else {
-        msg('❌ Reação instável! Sequência incorreta. O sistema resetou.');
-        sequencia = []; document.getElementById('seq-display').textContent = '—';
+        msg('❌ Reação instável! Sequência incorreta. Os reagentes foram descartados — tente novamente.');
+        sequencia = [];
+        document.getElementById('seq-display').textContent = '—';
       }
     }
 
-    // INPUT
-    input.onClick((x, y) => { if (painelAberto || EscapeTransitions.isTransitioning()) return; const obj = input.hitTest(x, y, getObjetos()); if (obj) interagir(obj); });
+    // ============ INPUT ============
+    input.onClick((x, y) => {
+      if (painelAlarmeAberto || painelPurifAberto) return;
+      if (EscapeTransitions.isTransitioning()) return;
+      const obj = input.hitTest(x, y, getObjetos());
+      if (obj) interagir(obj);
+    });
 
-    // RENDER
+    // ============ RENDER ============
     game.onRender((ctx, dt, size) => {
       const amb = state.getAmbiente();
-      if (amb === 'lab') renderLab(ctx);
-      else if (amb === 'contencao') renderContencao(ctx);
-      else renderDeposito(ctx);
-      // Highlight
-      const hovered = input.getHoveredObject(getObjetos());
-      for (const obj of getObjetos()) {
-        if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); }
+
+      if (amb === 'lab') {
+        renderLab(ctx, state);
+      } else if (amb === 'contencao') {
+        renderContencao(ctx, state);
+      } else {
+        renderDeposito(ctx, state);
       }
-      vapor.update(dt); vapor.render(ctx);
+
+      // Highlight de objetos interativos
+      const hovered = input.getHoveredObject(getObjetos());
+      const objs = getObjetos();
+      for (const obj of objs) {
+        ctx.save();
+        if (hovered && hovered.id === obj.id) {
+          ctx.strokeStyle = UITokens.get('glowColor');
+          ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor');
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+        }
+        ctx.restore();
+      }
+
+      // Partículas de vapor
+      vapor.update(dt);
+      vapor.render(ctx);
+
+      // Transição
       EscapeTransitions.render(ctx, size.width, size.height);
     });
 
-    function renderLab(ctx) {
-      ctx.fillStyle = '#0f1a12'; ctx.fillRect(0, 0, 900, 450);
-      ctx.fillStyle = '#0a120c'; ctx.fillRect(0, 450, 900, 150);
-      ctx.strokeStyle = '#1b5e20'; ctx.beginPath(); ctx.moveTo(0,450); ctx.lineTo(900,450); ctx.stroke();
-      // Alerta pulsante
-      const pulse = Math.sin(Date.now() / 500) * 0.3 + 0.5;
-      ctx.fillStyle = `rgba(255,50,50,${pulse * 0.1})`; ctx.fillRect(0, 0, 900, 10);
-      // Computador
-      ctx.fillStyle = '#111'; ctx.fillRect(355, 55, 150, 110); ctx.strokeStyle = '#333'; ctx.strokeRect(355, 55, 150, 110);
-      ctx.fillStyle = '#0a2a0a'; ctx.fillRect(360, 60, 140, 90);
-      ctx.fillStyle = '#00ff88'; ctx.font = '10px monospace'; ctx.fillText('HELIX OS v3.2', 370, 80); ctx.fillText('> ALERTA ATIVO', 370, 95);
-      // Microscópio
-      ctx.fillStyle = '#222'; ctx.fillRect(80, 120, 60, 70); ctx.fillStyle = '#444'; ctx.fillRect(95, 100, 30, 20);
-      // Centrífuga
-      ctx.fillStyle = '#1a1a1a'; ctx.fillRect(65, 285, 100, 70); ctx.strokeStyle = '#3a5a3a'; ctx.strokeRect(65, 285, 100, 70);
-      ctx.beginPath(); ctx.arc(115, 320, 20, 0, Math.PI*2); ctx.strokeStyle = '#555'; ctx.stroke();
-      // Painel alarme
-      ctx.fillStyle = state.get('alarmeDesligado') ? '#0a2a0a' : '#2a0a0a';
-      ctx.fillRect(705, 65, 110, 90); ctx.strokeStyle = state.get('alarmeDesligado') ? '#2e7d32' : '#c62828'; ctx.strokeRect(705, 65, 110, 90);
-      ctx.fillStyle = state.get('alarmeDesligado') ? '#66bb6a' : '#ef5350'; ctx.font = '11px monospace';
-      ctx.fillText(state.get('alarmeDesligado') ? 'DESLIGADO' : 'ATIVO', 725, 115);
-      // Clipboard
-      ctx.fillStyle = '#2a2a1a'; ctx.fillRect(555, 355, 75, 95); ctx.strokeStyle = '#5a5a3a'; ctx.strokeRect(555, 355, 75, 95);
-      // Portas
-      ctx.fillStyle = '#0a1a0a'; ctx.fillRect(785, 305, 65, 155); ctx.strokeStyle = '#1b5e20'; ctx.strokeRect(785, 305, 65, 155);
-      ctx.fillStyle = '#0a1a0a'; ctx.fillRect(55, 445, 95, 115); ctx.strokeStyle = '#1b5e20'; ctx.strokeRect(55, 445, 95, 115);
-    }
-
-    function renderContencao(ctx) {
-      ctx.fillStyle = '#080e14'; ctx.fillRect(0, 0, 900, 450);
-      ctx.fillStyle = '#060a10'; ctx.fillRect(0, 450, 900, 150);
-      // Luz UV
-      ctx.fillStyle = 'rgba(50,100,200,0.04)'; ctx.fillRect(0, 0, 900, 600);
-      // Painel purificação
-      ctx.fillStyle = '#0a1520'; ctx.fillRect(255, 85, 390, 140); ctx.strokeStyle = '#1565c0'; ctx.lineWidth = 2; ctx.strokeRect(255, 85, 390, 140);
-      ctx.fillStyle = '#64b5f6'; ctx.font = '12px monospace'; ctx.fillText('PAINEL DE PURIFICAÇÃO', 350, 110);
-      ctx.fillText('[ _ ] → [ _ ] → [ _ ] → [ _ ]', 330, 150); ctx.lineWidth = 1;
-      // Visor
-      ctx.fillStyle = '#0a2a1a'; ctx.fillRect(65, 105, 125, 120); ctx.strokeStyle = '#2e7d32'; ctx.strokeRect(65, 105, 125, 120);
-      ctx.fillStyle = '#00ff8844'; ctx.beginPath(); ctx.arc(127, 165, 30, 0, Math.PI*2); ctx.fill();
-      // Manual
-      ctx.fillStyle = '#1a1510'; ctx.fillRect(705, 305, 95, 115); ctx.strokeStyle = '#5a4a30'; ctx.strokeRect(705, 305, 95, 115);
-      // Tubos
-      ctx.fillStyle = '#1a1a2a'; ctx.fillRect(355, 355, 190, 75); ctx.strokeStyle = '#3a3a5a'; ctx.strokeRect(355, 355, 190, 75);
-      // Voltar
-      ctx.fillStyle = '#0a1520'; ctx.fillRect(55, 505, 115, 45); ctx.strokeStyle = '#1565c0'; ctx.strokeRect(55, 505, 115, 45);
-      ctx.fillStyle = '#64b5f6'; ctx.font = '11px monospace'; ctx.fillText('← Voltar', 80, 532);
-    }
-
-    function renderDeposito(ctx) {
-      ctx.fillStyle = '#0a0e14'; ctx.fillRect(0, 0, 900, 450);
-      ctx.fillStyle = '#080c10'; ctx.fillRect(0, 450, 900, 150);
-      // Condensação
-      ctx.fillStyle = 'rgba(150,200,255,0.02)'; ctx.fillRect(0, 0, 900, 600);
-      // Reagentes
-      const cores = ['#1565c0', '#c62828', '#2e7d32', '#f9a825', '#6a1b9a'];
-      const xs = [60, 170, 280, 390, 500];
-      for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = '#0a1a2a'; ctx.fillRect(xs[i], 85, 75, 90); ctx.strokeStyle = cores[i]; ctx.strokeRect(xs[i], 85, 75, 90);
-        ctx.fillStyle = cores[i]; ctx.fillRect(xs[i]+25, 100, 25, 50); // Frasco
-        ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`R-0${i+1}`, xs[i]+22, 170);
-      }
-      // Refrigerador
-      ctx.fillStyle = '#1a2030'; ctx.fillRect(655, 105, 115, 170); ctx.strokeStyle = '#3a5a7a'; ctx.strokeRect(655, 105, 115, 170);
-      ctx.fillStyle = '#5a8aaa'; ctx.font = '11px monospace'; ctx.fillText('REFRIGERADOR', 662, 195);
-      // Tabela
-      ctx.fillStyle = '#1a1a0a'; ctx.fillRect(655, 355, 145, 95); ctx.strokeStyle = '#5a5a2a'; ctx.strokeRect(655, 355, 145, 95);
-      ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText('TABELA PERIÓDICA', 665, 405);
-      // Voltar
-      ctx.fillStyle = '#0a1520'; ctx.fillRect(55, 505, 115, 45); ctx.strokeStyle = '#1565c0'; ctx.strokeRect(55, 505, 115, 45);
-      ctx.fillStyle = '#64b5f6'; ctx.font = '11px monospace'; ctx.fillText('← Voltar', 80, 532);
-    }
-
+    // ============ START ============
     game.start();
     UIInventory.render('inventory', inv.getAll());
   </script>
