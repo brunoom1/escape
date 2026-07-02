@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 1 — O Escritório do Detetive</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0d0b08;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 16px;
+      gap: 12px;
+    }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper {
+      position: relative;
+      width: 900px;
+      max-width: 100%;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+      border: 1px solid #3d3425;
+      cursor: crosshair;
+    }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message { width: 100%; max-width: 910px; }
+    #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <!-- Lib -->
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/events.js"></script>
+  <script src="../lib/particles.js"></script>
+
+  <!-- UI Kit -->
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/noir.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+
+  <script>
+    // ============ SETUP ============
+    UITokens.apply(ThemeNoir);
+
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0d0b08' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'escritorio', flags: {
+      quadroVisto: false, laptopVisto: false, gavetaAberta: false,
+      estanteVista: false, livroVermelho: false, passagemAberta: false,
+      luminaria: false, lixeira: false, cofreAberto: false, portaVista: false,
+      gavetaAVista: false, gavetaBVista: false, gavetaCVista: false,
+      muralVisto: false, pastaVista: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+    const bus = EscapeEvents.create();
+
+    // UI Components
+    UITabs.create('tabs', [
+      { id: 'escritorio', label: 'Escritório', locked: false },
+      { id: 'arquivo', label: 'Arquivo Secreto', locked: true }
+    ], (tabId) => {
+      if (tabId === 'arquivo' && !state.get('passagemAberta')) {
+        msg('A passagem ainda não foi descoberta.');
+        UITabs.setActive('tabs', 'escritorio');
+        return;
+      }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+        state.setAmbiente(tabId);
+        if (tabId === 'arquivo') msg('Uma sala oculta. Gavetas metálicas, luz de neon fria. Moreira era mais paranóico do que diziam.');
+        else msg('De volta ao escritório de Moreira.');
+      });
+    });
+
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
+
+    const dust = EscapeParticles.create({
+      x: 0, y: 0, width: 900, height: 600,
+      color: 'rgba(180, 160, 120, 0.2)',
+      count: 25, speedX: [-3, 3], speedY: [-5, -1], size: [1, 2], life: [5, 10]
+    });
+
+    function msg(text) { UIMessageBox.show('message', text); }
+    msg('O escritório do Detetive Moreira. Poeira cobre tudo. O ar está parado há semanas. A porta trancou atrás de você.');
+    timer.start();
+
+    // ============ OBJETOS ============
+    const objetosEscritorio = [
+      { id: 'quadro', x: 350, y: 30, w: 200, h: 150, label: 'Quadro de Investigação' },
+      { id: 'laptop', x: 280, y: 320, w: 120, h: 80, label: 'Laptop' },
+      { id: 'gaveta', x: 420, y: 380, w: 80, h: 50, label: 'Gaveta da mesa' },
+      { id: 'estante', x: 30, y: 60, w: 140, h: 380, label: 'Estante' },
+      { id: 'livroVermelho', x: 60, y: 200, w: 30, h: 50, label: 'Livro vermelho' },
+      { id: 'luminaria', x: 700, y: 250, w: 60, h: 120, label: 'Luminária' },
+      { id: 'lixeira', x: 750, y: 480, w: 50, h: 60, label: 'Lixeira' },
+      { id: 'cofre', x: 680, y: 80, w: 100, h: 90, label: 'Cofre' },
+      { id: 'porta', x: 820, y: 180, w: 60, h: 200, label: 'Porta' },
+    ];
+
+    const objetosArquivo = [
+      { id: 'gavetaA', x: 80, y: 120, w: 150, h: 70, label: 'Gaveta A — Caso 847' },
+      { id: 'gavetaB', x: 80, y: 210, w: 150, h: 70, label: 'Gaveta B' },
+      { id: 'gavetaC', x: 80, y: 300, w: 150, h: 70, label: 'Gaveta C' },
+      { id: 'gavetaD', x: 80, y: 390, w: 150, h: 70, label: 'Gaveta D (trancada)' },
+      { id: 'mural', x: 350, y: 50, w: 250, h: 200, label: 'Mural de recortes' },
+      { id: 'pasta', x: 450, y: 350, w: 140, h: 90, label: 'Pasta aberta' },
+      { id: 'voltar', x: 750, y: 500, w: 120, h: 60, label: 'Voltar' },
+    ];
+
+    function getObjetos() {
+      return state.getAmbiente() === 'escritorio' ? objetosEscritorio : objetosArquivo;
+    }
+
+    // ============ INTERAÇÕES ============
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+
+      // -- ESCRITÓRIO --
+      if (id === 'quadro') {
+        if (!state.get('quadroVisto')) {
+          state.set('quadroVisto', true);
+          inv.add('caso847', '📋', 'Caso #847 — Meridian');
+          msg('Um quadro cheio de fotos, recortes e fios vermelhos. No centro: "CASO #847 — Meridian". Fios conectam nomes a uma conta bancária.');
+        } else {
+          msg('Caso #847 — Meridian. Os fios levam a um nome: "V. Torres".');
+        }
+      } else if (id === 'laptop') {
+        if (!state.get('laptopVisto')) {
+          state.set('laptopVisto', true);
+          inv.add('log4dig', '💻', 'Log: formato 4 dígitos');
+          msg('O laptop está em standby. Log do sistema: "Cofre atualizado: formato 4 dígitos". Bateria em 3%.');
+        } else {
+          msg('Log: "formato 4 dígitos". A bateria está quase acabando.');
+        }
+      } else if (id === 'gaveta') {
+        if (!state.get('gavetaAberta')) {
+          state.set('gavetaAberta', true);
+          inv.add('agenda', '📓', 'Agenda: 3º livro vermelho');
+          msg('Na gaveta há uma agenda. Sobrou uma anotação: "Estante — 3º livro vermelho — puxar".');
+        } else {
+          msg('Agenda: "Estante — 3º livro vermelho — puxar".');
+        }
+      } else if (id === 'estante') {
+        if (!state.get('estanteVista')) {
+          state.set('estanteVista', true);
+          msg('Uma estante cheia de livros sobre direito penal e contabilidade. Um livro vermelho se destaca na 3ª posição.');
+        } else {
+          msg('O livro vermelho na 3ª posição parece diferente.');
+        }
+      } else if (id === 'livroVermelho') {
+        if (!state.get('passagemAberta')) {
+          if (state.get('gavetaAberta')) {
+            state.set('passagemAberta', true);
+            UITabs.unlock('tabs', 'arquivo');
+            msg('Você puxa o livro vermelho. Um click mecânico. A estante desliza revelando uma passagem escura para um arquivo secreto!');
+          } else {
+            msg('Um livro vermelho na estante. Parece preso. Talvez haja alguma pista de como usá-lo.');
+          }
+        } else {
+          msg('A passagem para o arquivo está aberta.');
+        }
+      } else if (id === 'luminaria') {
+        if (!state.get('luminaria')) {
+          state.set('luminaria', true);
+          inv.add('bilhete', '💡', 'Bilhete: protocolei no arquivo');
+          msg('Ao acender a luminária, um bilhete no chão fica visível: "Eles sabem do caso. Protocolei tudo no arquivo. — M"');
+        } else {
+          msg('Bilhete: "Protocolei tudo no arquivo. — M"');
+        }
+      } else if (id === 'lixeira') {
+        if (!state.get('lixeira')) {
+          state.set('lixeira', true);
+          inv.add('rabisco', '🗑️', '#0847 — exige 4 dígitos');
+          msg('Papéis amassados. Um rabisco: "Não pode ser 847... é #0847? Sistema exige 4." E um X riscado.');
+        } else {
+          msg('Rabisco: "#0847? Sistema exige 4." — riscado com frustração.');
+        }
+      } else if (id === 'cofre') {
+        abrirPainelCofre();
+      } else if (id === 'porta') {
+        if (state.get('cofreAberto')) {
+          escapar();
+        } else {
+          msg('A porta está trancada. O mecanismo exige um cartão magnético que está dentro do cofre.');
+        }
+      }
+
+      // -- ARQUIVO SECRETO --
+      else if (id === 'gavetaA') {
+        if (!state.get('gavetaAVista')) {
+          state.set('gavetaAVista', true);
+          inv.add('pasta0847', '📁', 'Pasta #0847 — confirmação');
+          msg('Pasta etiquetada "#0847 — Meridian". Dentro: fotos de reuniões secretas, extratos bancários. Nota: "Torres é o intermediário".');
+        } else {
+          msg('Caso #0847. A etiqueta confirma: quatro dígitos com zero.');
+        }
+      } else if (id === 'gavetaB') {
+        if (!state.get('gavetaBVista')) {
+          state.set('gavetaBVista', true);
+          msg('Vazia. Apenas poeira e um clipe de papel.');
+        } else { msg('Vazia.'); }
+      } else if (id === 'gavetaC') {
+        if (!state.get('gavetaCVista')) {
+          state.set('gavetaCVista', true);
+          msg('Caso antigo. Irrelevante para a situação.');
+        } else { msg('Caso antigo. Nada útil aqui.'); }
+      } else if (id === 'gavetaD') {
+        msg('Trancada. Não é prioridade agora.');
+      } else if (id === 'mural') {
+        if (!state.get('muralVisto')) {
+          state.set('muralVisto', true);
+          msg('Manchetes: "Construtora Meridian fecha contrato milionário". Uma foto circulada em vermelho: rosto de um homem de terno.');
+        } else {
+          msg('Manchetes sobre a Meridian. O rosto circulado... Torres?');
+        }
+      } else if (id === 'pasta') {
+        if (!state.get('pastaVista')) {
+          state.set('pastaVista', true);
+          inv.add('conclusao', '📝', '"O código é o caso" — A.M.');
+          msg('Conclusão de Moreira: "Provas no cofre. Se algo me acontecer, o código é o caso. Quem me conhece, sabe." Assinado A.M.');
+        } else {
+          msg('"O código é o caso." — Augusto Moreira.');
+        }
+      } else if (id === 'voltar') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+          state.setAmbiente('escritorio');
+          UITabs.setActive('tabs', 'escritorio');
+          msg('De volta ao escritório de Moreira.');
+        });
+      }
+
+      // Atualizar inventário visual
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // ============ PUZZLE DO COFRE ============
+    let painelAberto = false;
+
+    function abrirPainelCofre() {
+      if (state.get('cofreAberto')) {
+        msg('O cofre já está aberto. O cartão magnético está dentro.');
+        return;
+      }
+      painelAberto = true;
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:16px;">🔒 Cofre de Segurança — Código de 4 dígitos</p>
+        <input type="text" id="codigoInput" maxlength="4" placeholder="_ _ _ _"
+          style="background:#111; border:1px solid #3d3425; color:#c9a84c; font-family:'Courier New'; font-size:1.5rem; padding:10px; width:140px; text-align:center; border-radius:4px;">
+        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+          <button id="btnTentar" style="padding:8px 20px; background:#1a1610; border:1px solid #3d3425; color:#d4c9a8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Tentar</button>
+          <button id="btnVoltar" style="padding:8px 20px; background:#1a1610; border:1px solid #3d3425; color:#d4c9a8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>
+      `;
+      UIPanel.setContent('puzzle-panel', html);
+      UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('codigoInput').focus();
+        document.getElementById('btnTentar').addEventListener('click', tentarCodigo);
+        document.getElementById('btnVoltar').addEventListener('click', fecharPainel);
+        document.getElementById('codigoInput').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') tentarCodigo();
+        });
+      }, 50);
+      msg('Um cofre embutido na parede. Teclado numérico com 4 posições. Placa: "Protocolo de Segurança Moreira".');
+    }
+
+    function tentarCodigo() {
+      const input = document.getElementById('codigoInput');
+      if (!input) return;
+      const valor = input.value.trim();
+      if (valor === '0847') {
+        state.set('cofreAberto', true);
+        painelAberto = false;
+        UIPanel.hide('puzzle-panel');
+        inv.add('cartao', '💳', 'Cartão magnético');
+        UIInventory.render('inventory', inv.getAll());
+        msg('✅ O cofre abre! Dentro: um cartão magnético e um pendrive. As provas de Moreira. Agora você pode abrir a porta.');
+      } else {
+        msg('❌ Código incorreto. O mecanismo faz um som de rejeição.');
+        input.value = '';
+        input.focus();
+      }
+    }
+
+    function fecharPainel() {
+      painelAberto = false;
+      UIPanel.hide('puzzle-panel');
+      msg('Você se afasta do cofre.');
+    }
+
+    // ============ ESCAPE ============
+    function escapar() {
+      timer.stop();
+      UISuccessOverlay.show('success-overlay', {
+        title: '🎉 VOCÊ ESCAPOU!',
+        subtitle: 'As provas da fraude Meridian estão seguras. O caso do Detetive Moreira vai ser reaberto.',
+        time: timer.format(),
+        links: [
+          { text: '← Voltar ao Lobby', href: '../index.html' }
+        ]
+      });
+    }
+
+    // ============ INPUT ============
+    input.onClick((x, y) => {
+      if (painelAberto) return;
+      if (EscapeTransitions.isTransitioning()) return;
+      const obj = input.hitTest(x, y, getObjetos());
+      if (obj) interagir(obj);
+    });
+
+    // ============ RENDER ============
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+
+      if (amb === 'escritorio') {
+        renderEscritorio(ctx);
+      } else {
+        renderArquivo(ctx);
+      }
+
+      // Objetos interativos (highlight)
+      const hovered = input.getHoveredObject(getObjetos());
+      const objs = getObjetos();
+      for (const obj of objs) {
+        ctx.save();
+        if (hovered && hovered.id === obj.id) {
+          ctx.strokeStyle = UITokens.get('glowColor');
+          ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor');
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+        }
+        ctx.restore();
+      }
+
+      // Partículas
+      dust.update(dt);
+      dust.render(ctx);
+
+      // Transição
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    function renderEscritorio(ctx) {
+      // Parede
+      ctx.fillStyle = '#1a1610';
+      ctx.fillRect(0, 0, 900, 450);
+      // Chão
+      ctx.fillStyle = '#12100c';
+      ctx.fillRect(0, 450, 900, 150);
+      ctx.strokeStyle = '#3d3425';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 450); ctx.lineTo(900, 450); ctx.stroke();
+
+      // Estante
+      ctx.fillStyle = '#2a1f14';
+      ctx.fillRect(30, 60, 140, 390);
+      ctx.strokeStyle = '#4d3b2f';
+      ctx.strokeRect(30, 60, 140, 390);
+      // Livros
+      const livrosCores = ['#8b0000', '#006400', '#8b0000', '#00008b', '#006400'];
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = livrosCores[i];
+        ctx.fillRect(45 + i * 22, 100, 18, 50);
+      }
+      // Livro vermelho destaque
+      ctx.fillStyle = state.get('passagemAberta') ? '#4d0000' : '#cc0000';
+      ctx.fillRect(60, 200, 30, 50);
+      if (!state.get('passagemAberta') && state.get('gavetaAberta')) {
+        ctx.strokeStyle = '#ffcc00';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(60, 200, 30, 50);
+      }
+
+      // Quadro investigação
+      ctx.fillStyle = '#111';
+      ctx.fillRect(350, 30, 200, 150);
+      ctx.strokeStyle = '#4d3b2f';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(350, 30, 200, 150);
+      ctx.fillStyle = '#c9a84c';
+      ctx.font = '11px Courier New';
+      ctx.fillText('CASO #847', 400, 70);
+      ctx.fillText('MERIDIAN', 410, 90);
+      // Fios
+      ctx.strokeStyle = '#8b0000';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(380, 100); ctx.lineTo(430, 140); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(500, 80); ctx.lineTo(470, 130); ctx.stroke();
+
+      // Mesa
+      ctx.fillStyle = '#2a1f14';
+      ctx.fillRect(260, 310, 260, 120);
+      ctx.strokeStyle = '#4d3b2f';
+      ctx.strokeRect(260, 310, 260, 120);
+      // Laptop
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(285, 325, 110, 70);
+      ctx.fillStyle = state.get('laptopVisto') ? '#1a2a1a' : '#0d1a0d';
+      ctx.fillRect(290, 330, 100, 55);
+      // Gaveta
+      ctx.fillStyle = '#1a1610';
+      ctx.fillRect(420, 380, 80, 40);
+      ctx.strokeStyle = '#3d3425';
+      ctx.strokeRect(420, 380, 80, 40);
+
+      // Luminária
+      ctx.fillStyle = '#333';
+      ctx.fillRect(725, 310, 8, 60);
+      ctx.fillStyle = state.get('luminaria') ? '#c9a84c' : '#444';
+      ctx.beginPath(); ctx.arc(729, 290, 25, Math.PI, 0); ctx.fill();
+
+      // Lixeira
+      ctx.fillStyle = '#222';
+      ctx.fillRect(750, 480, 50, 60);
+      ctx.strokeStyle = '#444';
+      ctx.strokeRect(750, 480, 50, 60);
+
+      // Cofre
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(680, 80, 100, 90);
+      ctx.strokeStyle = state.get('cofreAberto') ? '#5fa85f' : '#555';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(680, 80, 100, 90);
+      ctx.fillStyle = '#666';
+      ctx.beginPath(); ctx.arc(730, 125, 8, 0, Math.PI * 2); ctx.fill();
+
+      // Porta
+      ctx.fillStyle = '#1a0f08';
+      ctx.fillRect(820, 180, 60, 200);
+      ctx.strokeStyle = '#3d2b1f';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(820, 180, 60, 200);
+      ctx.fillStyle = '#aa8833';
+      ctx.beginPath(); ctx.arc(835, 280, 5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    function renderArquivo(ctx) {
+      // Parede fria
+      ctx.fillStyle = '#0e1118';
+      ctx.fillRect(0, 0, 900, 450);
+      // Chão
+      ctx.fillStyle = '#0a0d12';
+      ctx.fillRect(0, 450, 900, 150);
+      ctx.strokeStyle = '#2a3040';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 450); ctx.lineTo(900, 450); ctx.stroke();
+
+      // Luz neon (brilho superior)
+      ctx.fillStyle = 'rgba(100, 150, 200, 0.03)';
+      ctx.fillRect(0, 0, 900, 100);
+
+      // Gavetas metálicas
+      const gavetasY = [120, 210, 300, 390];
+      const labels = ['A', 'B', 'C', 'D'];
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = '#1a2030';
+        ctx.fillRect(80, gavetasY[i], 150, 65);
+        ctx.strokeStyle = '#3a4a5a';
+        ctx.strokeRect(80, gavetasY[i], 150, 65);
+        ctx.fillStyle = '#5a6a7a';
+        ctx.font = '12px Courier New';
+        ctx.fillText(labels[i], 150, gavetasY[i] + 38);
+        // Puxador
+        ctx.fillStyle = '#667';
+        ctx.fillRect(130, gavetasY[i] + 28, 40, 6);
+      }
+      // Gaveta D trancada
+      ctx.fillStyle = '#888';
+      ctx.font = '14px Courier New';
+      ctx.fillText('🔒', 200, gavetasY[3] + 40);
+
+      // Mural
+      ctx.fillStyle = '#1a1a0a';
+      ctx.fillRect(350, 50, 250, 200);
+      ctx.strokeStyle = '#4d4d3d';
+      ctx.strokeRect(350, 50, 250, 200);
+      // Recortes
+      ctx.fillStyle = '#d4c9a8';
+      ctx.fillRect(370, 70, 80, 50);
+      ctx.fillRect(470, 90, 90, 40);
+      ctx.fillStyle = '#8b0000';
+      ctx.beginPath(); ctx.arc(515, 110, 15, 0, Math.PI * 2); ctx.stroke();
+
+      // Pasta aberta
+      ctx.fillStyle = '#2a2010';
+      ctx.fillRect(450, 350, 140, 90);
+      ctx.strokeStyle = '#5a4a30';
+      ctx.strokeRect(450, 350, 140, 90);
+      ctx.fillStyle = '#d4c9a8';
+      ctx.font = '10px Courier New';
+      ctx.fillText('Conclusão:', 465, 380);
+      ctx.fillText('"O código é', 465, 395);
+      ctx.fillText(' o caso" —A.M.', 465, 410);
+
+      // Botão voltar
+      ctx.fillStyle = '#1a2030';
+      ctx.fillRect(750, 500, 120, 60);
+      ctx.strokeStyle = '#3a4a5a';
+      ctx.strokeRect(750, 500, 120, 60);
+      ctx.fillStyle = '#8a9aaa';
+      ctx.font = '12px Courier New';
+      ctx.fillText('← Voltar', 775, 535);
+    }
+
+    // ============ START ============
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>
