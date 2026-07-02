@@ -65,8 +65,6 @@
   <script src="../ui-kit/components/message-box.js"></script>
   <script src="../ui-kit/components/panel.js"></script>
   <script src="../ui-kit/components/success-overlay.js"></script>
-
-  <script>
     // ============ SETUP ============
     UITokens.apply(ThemeNoir);
 
@@ -117,25 +115,25 @@
 
     // ============ OBJETOS ============
     const objetosEscritorio = [
-      { id: 'quadro', x: 350, y: 30, w: 200, h: 150, label: 'Quadro de Investigação' },
-      { id: 'laptop', x: 280, y: 320, w: 120, h: 80, label: 'Laptop' },
-      { id: 'gaveta', x: 420, y: 380, w: 80, h: 50, label: 'Gaveta da mesa' },
-      { id: 'estante', x: 30, y: 60, w: 140, h: 380, label: 'Estante' },
-      { id: 'livroVermelho', x: 60, y: 200, w: 30, h: 50, label: 'Livro vermelho' },
-      { id: 'luminaria', x: 700, y: 250, w: 60, h: 120, label: 'Luminária' },
-      { id: 'lixeira', x: 750, y: 480, w: 50, h: 60, label: 'Lixeira' },
-      { id: 'cofre', x: 680, y: 80, w: 100, h: 90, label: 'Cofre' },
-      { id: 'porta', x: 820, y: 180, w: 60, h: 200, label: 'Porta' },
+      { id: 'quadro', x: 340, y: 40, w: 220, h: 165, label: 'Quadro de Investigação' },
+      { id: 'laptop', x: 310, y: 310, w: 120, h: 75, label: 'Laptop' },
+      { id: 'gaveta', x: 445, y: 360, w: 95, h: 50, label: 'Gaveta da mesa' },
+      { id: 'estante', x: 140, y: 80, w: 145, h: 345, label: 'Estante' },
+      { id: 'livroVermelho', x: 170, y: 170, w: 26, h: 48, label: 'Livro vermelho' },
+      { id: 'luminaria', x: 710, y: 250, w: 50, h: 180, label: 'Luminária' },
+      { id: 'lixeira', x: 760, y: 480, w: 55, h: 65, label: 'Lixeira' },
+      { id: 'cofre', x: 620, y: 80, w: 110, h: 100, label: 'Cofre' },
+      { id: 'porta', x: 810, y: 130, w: 70, h: 290, label: 'Porta' },
     ];
 
     const objetosArquivo = [
-      { id: 'gavetaA', x: 80, y: 120, w: 150, h: 70, label: 'Gaveta A — Caso 847' },
-      { id: 'gavetaB', x: 80, y: 210, w: 150, h: 70, label: 'Gaveta B' },
-      { id: 'gavetaC', x: 80, y: 300, w: 150, h: 70, label: 'Gaveta C' },
-      { id: 'gavetaD', x: 80, y: 390, w: 150, h: 70, label: 'Gaveta D (trancada)' },
-      { id: 'mural', x: 350, y: 50, w: 250, h: 200, label: 'Mural de recortes' },
-      { id: 'pasta', x: 450, y: 350, w: 140, h: 90, label: 'Pasta aberta' },
-      { id: 'voltar', x: 750, y: 500, w: 120, h: 60, label: 'Voltar' },
+      { id: 'gavetaA', x: 80, y: 100, w: 160, h: 72, label: 'Gaveta A — Caso 847' },
+      { id: 'gavetaB', x: 80, y: 185, w: 160, h: 72, label: 'Gaveta B' },
+      { id: 'gavetaC', x: 80, y: 270, w: 160, h: 72, label: 'Gaveta C' },
+      { id: 'gavetaD', x: 80, y: 355, w: 160, h: 72, label: 'Gaveta D (trancada)' },
+      { id: 'mural', x: 340, y: 50, w: 270, h: 210, label: 'Mural de recortes' },
+      { id: 'pasta', x: 450, y: 355, w: 140, h: 95, label: 'Pasta aberta' },
+      { id: 'voltar', x: 735, y: 500, w: 130, h: 55, label: 'Voltar' },
     ];
 
     function getObjetos() {
@@ -346,9 +344,9 @@
       const amb = state.getAmbiente();
 
       if (amb === 'escritorio') {
-        renderEscritorio(ctx);
+        renderEscritorio(ctx, state);
       } else {
-        renderArquivo(ctx);
+        renderArquivo(ctx, state);
       }
 
       // Objetos interativos (highlight)
@@ -373,168 +371,6 @@
       // Transição
       EscapeTransitions.render(ctx, size.width, size.height);
     });
-
-    function renderEscritorio(ctx) {
-      // Parede
-      ctx.fillStyle = '#1a1610';
-      ctx.fillRect(0, 0, 900, 450);
-      // Chão
-      ctx.fillStyle = '#12100c';
-      ctx.fillRect(0, 450, 900, 150);
-      ctx.strokeStyle = '#3d3425';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(0, 450); ctx.lineTo(900, 450); ctx.stroke();
-
-      // Estante
-      ctx.fillStyle = '#2a1f14';
-      ctx.fillRect(30, 60, 140, 390);
-      ctx.strokeStyle = '#4d3b2f';
-      ctx.strokeRect(30, 60, 140, 390);
-      // Livros
-      const livrosCores = ['#8b0000', '#006400', '#8b0000', '#00008b', '#006400'];
-      for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = livrosCores[i];
-        ctx.fillRect(45 + i * 22, 100, 18, 50);
-      }
-      // Livro vermelho destaque
-      ctx.fillStyle = state.get('passagemAberta') ? '#4d0000' : '#cc0000';
-      ctx.fillRect(60, 200, 30, 50);
-      if (!state.get('passagemAberta') && state.get('gavetaAberta')) {
-        ctx.strokeStyle = '#ffcc00';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(60, 200, 30, 50);
-      }
-
-      // Quadro investigação
-      ctx.fillStyle = '#111';
-      ctx.fillRect(350, 30, 200, 150);
-      ctx.strokeStyle = '#4d3b2f';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(350, 30, 200, 150);
-      ctx.fillStyle = '#c9a84c';
-      ctx.font = '11px Courier New';
-      ctx.fillText('CASO #847', 400, 70);
-      ctx.fillText('MERIDIAN', 410, 90);
-      // Fios
-      ctx.strokeStyle = '#8b0000';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(380, 100); ctx.lineTo(430, 140); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(500, 80); ctx.lineTo(470, 130); ctx.stroke();
-
-      // Mesa
-      ctx.fillStyle = '#2a1f14';
-      ctx.fillRect(260, 310, 260, 120);
-      ctx.strokeStyle = '#4d3b2f';
-      ctx.strokeRect(260, 310, 260, 120);
-      // Laptop
-      ctx.fillStyle = '#0a0a0a';
-      ctx.fillRect(285, 325, 110, 70);
-      ctx.fillStyle = state.get('laptopVisto') ? '#1a2a1a' : '#0d1a0d';
-      ctx.fillRect(290, 330, 100, 55);
-      // Gaveta
-      ctx.fillStyle = '#1a1610';
-      ctx.fillRect(420, 380, 80, 40);
-      ctx.strokeStyle = '#3d3425';
-      ctx.strokeRect(420, 380, 80, 40);
-
-      // Luminária
-      ctx.fillStyle = '#333';
-      ctx.fillRect(725, 310, 8, 60);
-      ctx.fillStyle = state.get('luminaria') ? '#c9a84c' : '#444';
-      ctx.beginPath(); ctx.arc(729, 290, 25, Math.PI, 0); ctx.fill();
-
-      // Lixeira
-      ctx.fillStyle = '#222';
-      ctx.fillRect(750, 480, 50, 60);
-      ctx.strokeStyle = '#444';
-      ctx.strokeRect(750, 480, 50, 60);
-
-      // Cofre
-      ctx.fillStyle = '#1a1a1a';
-      ctx.fillRect(680, 80, 100, 90);
-      ctx.strokeStyle = state.get('cofreAberto') ? '#5fa85f' : '#555';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(680, 80, 100, 90);
-      ctx.fillStyle = '#666';
-      ctx.beginPath(); ctx.arc(730, 125, 8, 0, Math.PI * 2); ctx.fill();
-
-      // Porta
-      ctx.fillStyle = '#1a0f08';
-      ctx.fillRect(820, 180, 60, 200);
-      ctx.strokeStyle = '#3d2b1f';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(820, 180, 60, 200);
-      ctx.fillStyle = '#aa8833';
-      ctx.beginPath(); ctx.arc(835, 280, 5, 0, Math.PI * 2); ctx.fill();
-    }
-
-    function renderArquivo(ctx) {
-      // Parede fria
-      ctx.fillStyle = '#0e1118';
-      ctx.fillRect(0, 0, 900, 450);
-      // Chão
-      ctx.fillStyle = '#0a0d12';
-      ctx.fillRect(0, 450, 900, 150);
-      ctx.strokeStyle = '#2a3040';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(0, 450); ctx.lineTo(900, 450); ctx.stroke();
-
-      // Luz neon (brilho superior)
-      ctx.fillStyle = 'rgba(100, 150, 200, 0.03)';
-      ctx.fillRect(0, 0, 900, 100);
-
-      // Gavetas metálicas
-      const gavetasY = [120, 210, 300, 390];
-      const labels = ['A', 'B', 'C', 'D'];
-      for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = '#1a2030';
-        ctx.fillRect(80, gavetasY[i], 150, 65);
-        ctx.strokeStyle = '#3a4a5a';
-        ctx.strokeRect(80, gavetasY[i], 150, 65);
-        ctx.fillStyle = '#5a6a7a';
-        ctx.font = '12px Courier New';
-        ctx.fillText(labels[i], 150, gavetasY[i] + 38);
-        // Puxador
-        ctx.fillStyle = '#667';
-        ctx.fillRect(130, gavetasY[i] + 28, 40, 6);
-      }
-      // Gaveta D trancada
-      ctx.fillStyle = '#888';
-      ctx.font = '14px Courier New';
-      ctx.fillText('🔒', 200, gavetasY[3] + 40);
-
-      // Mural
-      ctx.fillStyle = '#1a1a0a';
-      ctx.fillRect(350, 50, 250, 200);
-      ctx.strokeStyle = '#4d4d3d';
-      ctx.strokeRect(350, 50, 250, 200);
-      // Recortes
-      ctx.fillStyle = '#d4c9a8';
-      ctx.fillRect(370, 70, 80, 50);
-      ctx.fillRect(470, 90, 90, 40);
-      ctx.fillStyle = '#8b0000';
-      ctx.beginPath(); ctx.arc(515, 110, 15, 0, Math.PI * 2); ctx.stroke();
-
-      // Pasta aberta
-      ctx.fillStyle = '#2a2010';
-      ctx.fillRect(450, 350, 140, 90);
-      ctx.strokeStyle = '#5a4a30';
-      ctx.strokeRect(450, 350, 140, 90);
-      ctx.fillStyle = '#d4c9a8';
-      ctx.font = '10px Courier New';
-      ctx.fillText('Conclusão:', 465, 380);
-      ctx.fillText('"O código é', 465, 395);
-      ctx.fillText(' o caso" —A.M.', 465, 410);
-
-      // Botão voltar
-      ctx.fillStyle = '#1a2030';
-      ctx.fillRect(750, 500, 120, 60);
-      ctx.strokeStyle = '#3a4a5a';
-      ctx.strokeRect(750, 500, 120, 60);
-      ctx.fillStyle = '#8a9aaa';
-      ctx.font = '12px Courier New';
-      ctx.fillText('← Voltar', 775, 535);
-    }
 
     // ============ START ============
     game.start();
