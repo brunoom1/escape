@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 8 — Pirâmide de Khufu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; background: #0d0a06; color: #e8d8b0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #3d3010; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/egypt.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+  <script>
+    UITokens.apply(ThemeEgypt);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0d0a06' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'antecamara', flags: {
+      rosetta: false, tocha: false, fragmento1: false,
+      muralEsq: false, muralDir: false, fragmento2: false,
+      tilesResolvido: false, fragmento3: false, sarcofago: false,
+      puzzleFinal: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+
+    // Hieroglyph system
+    const HIEROGLYPHS = {
+      sol: '☀', lua: '🌙', agua: '💧', fogo: '🔥',
+      terra: '🏔', ar: '💨', vida: '🌱', morte: '💀'
+    };
+    // Correct final sequence: Sol Água Vida Terra Fogo
+    const CORRECT_SEQUENCE = ['sol', 'agua', 'vida', 'terra', 'fogo'];
+
+    UITabs.create('tabs', [
+      { id: 'antecamara', label: 'Antecâmara', locked: false },
+      { id: 'corredor', label: 'Corredor das Armadilhas', locked: true },
+      { id: 'camara', label: 'Câmara do Faraó', locked: true }
+    ], (tabId) => {
+      if (tabId === 'corredor' && !inv.has('tocha')) {
+        msg('O corredor está em trevas absolutas. Você precisa de uma tocha.');
+        UITabs.setActive('tabs', 'antecamara'); return;
+      }
+      if (tabId === 'camara' && !state.get('tilesResolvido')) {
+        msg('O caminho está bloqueado por ladrilhos-armadilha. Resolva o corredor primeiro.');
+        UITabs.setActive('tabs', 'corredor'); return;
+      }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+        state.setAmbiente(tabId);
+        if (tabId === 'antecamara') msg('A antecâmara. Paredes cobertas de hieróglifos dourados. Ar seco e milenar.');
+        else if (tabId === 'corredor') msg('Corredor das Armadilhas. Ladrilhos no chão com símbolos. Murais nas paredes.');
+        else msg('A Câmara do Faraó. O sarcófago dourado. Um altar com 5 encaixes circulares.');
+      });
+    });
+
+    UIMessageBox.create('message'); UIInventory.create('inventory'); UIPanel.create('puzzle-panel'); UISuccessOverlay.create('success-overlay');
+    const dust = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(212,168,67,0.15)', count: 25, speedX: [-2,2], speedY: [-1,1], size: [1,2], life: [5,12] });
+    function msg(t) { UIMessageBox.show('message', t); }
+    msg('A Pirâmide de Khufu. Milênios de silêncio. Hieróglifos cobrem cada superfície. Decifre os símbolos antigos para alcançar a câmara do faraó.');
+    timer.start();
+
+    const objetosAntecamara = [
+      { id: 'rosetta', x: 80, y: 80, w: 200, h: 280, label: 'Pedra de Rosetta' },
+      { id: 'tocha', x: 700, y: 50, w: 80, h: 180, label: 'Tocha na parede' },
+      { id: 'fragmento1', x: 350, y: 400, w: 200, h: 80, label: 'Fragmento de papiro' },
+      { id: 'vasos', x: 600, y: 350, w: 120, h: 150, label: 'Vasos canópicos' },
+      { id: 'passagem_corredor', x: 780, y: 250, w: 100, h: 200, label: 'Passagem → Corredor' }
+    ];
+    const objetosCorredor = [
+      { id: 'muralEsq', x: 50, y: 50, w: 180, h: 250, label: 'Mural esquerdo' },
+      { id: 'muralDir', x: 670, y: 50, w: 180, h: 250, label: 'Mural direito' },
+      { id: 'fragmento2', x: 400, y: 100, w: 150, h: 60, label: 'Inscrição no teto' },
+      { id: 'tiles', x: 150, y: 380, w: 600, h: 180, label: 'Ladrilhos no chão' },
+      { id: 'voltarAnte', x: 20, y: 520, w: 130, h: 50, label: '← Antecâmara' },
+      { id: 'passagem_camara', x: 780, y: 350, w: 100, h: 180, label: 'Passagem → Câmara' }
+    ];
+    const objetosCamara = [
+      { id: 'altar', x: 280, y: 200, w: 340, h: 200, label: 'Altar dos Hieróglifos' },
+      { id: 'sarcofago', x: 350, y: 50, w: 200, h: 130, label: 'Sarcófago dourado' },
+      { id: 'fragmento3', x: 650, y: 400, w: 150, h: 80, label: 'Tábua de pedra' },
+      { id: 'voltarCorr', x: 20, y: 520, w: 130, h: 50, label: '← Corredor' }
+    ];
+
+    function getObjetos() {
+      const amb = state.getAmbiente();
+      if (amb === 'antecamara') return objetosAntecamara;
+      if (amb === 'corredor') return objetosCorredor;
+      return objetosCamara;
+    }
+
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+      // ANTECÂMARA
+      if (id === 'rosetta') {
+        if (!state.get('rosetta')) {
+          state.set('rosetta', true);
+          inv.add('rosetta_key', '🪨', 'Pedra: Sol=☀ Água=💧 Terra=🏔 Vida=🌱');
+          msg('A Pedra de Rosetta local! Quatro hieróglifos traduzidos: Sol = ☀, Água = 💧, Terra = 🏔, Vida = 🌱. Os outros quatro permanecem ocultos.');
+        } else msg('Sol=☀, Água=💧, Terra=🏔, Vida=🌱. Quatro conhecidos, quatro por descobrir.');
+      }
+      else if (id === 'tocha') {
+        if (!inv.has('tocha')) {
+          inv.add('tocha', '🔦', 'Tocha — ilumina o corredor');
+          UITabs.unlock('tabs', 'corredor');
+          msg('Uma tocha resinosa. A chama se acende ao toque. O Corredor das Armadilhas agora é acessível!');
+        } else msg('Já tem a tocha.');
+      }
+      else if (id === 'fragmento1') {
+        if (!state.get('fragmento1')) {
+          state.set('fragmento1', true);
+          inv.add('frag1', '📜', 'Fragmento: "Começa com a luz (Sol)"');
+          msg('Fragmento de papiro: "O mito da criação COMEÇA COM A LUZ" — Sol é o primeiro símbolo!');
+        } else msg('Fragmento: começa com a luz (Sol).');
+      }
+      else if (id === 'vasos') {
+        msg('Quatro vasos canópicos. Cada um guarda um órgão. Os hieróglifos nos vasos estão desgastados demais para ler.');
+      }
+      else if (id === 'passagem_corredor') {
+        if (inv.has('tocha')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('corredor'); UITabs.setActive('tabs', 'corredor'); msg('Corredor das Armadilhas. Ladrilhos suspeitos. Murais reveladores.'); });
+        } else msg('Escuridão total além. Precisa de uma tocha.');
+      }
+
+      // CORREDOR
+      else if (id === 'muralEsq') {
+        if (!state.get('muralEsq')) {
+          state.set('muralEsq', true);
+          inv.add('mural_opostos', '🖼️', 'Mural: opostos — Sol↔Lua, Água↔Fogo');
+          msg('Mural esquerdo mostra PARES OPOSTOS: O disco solar frente à lua crescente. Ondas frente às chamas. Sol↔Lua, Água↔Fogo!');
+        } else msg('Opostos: Sol↔Lua, Água↔Fogo.');
+      }
+      else if (id === 'muralDir') {
+        if (!state.get('muralDir')) {
+          state.set('muralDir', true);
+          inv.add('mural_opostos2', '🖼️', 'Mural: opostos — Terra↔Ar, Vida↔Morte');
+          msg('Mural direito: montanha contra redemoinhos de vento. Broto verde contra crânio. Terra↔Ar, Vida↔Morte! Agora conhece todos os 8 hieróglifos.');
+        } else msg('Opostos: Terra↔Ar, Vida↔Morte.');
+      }
+      else if (id === 'fragmento2') {
+        if (!state.get('fragmento2')) {
+          state.set('fragmento2', true);
+          inv.add('frag2', '📜', 'Inscrição: "água segue o sol, vida segue a água"');
+          msg('Inscrição no teto: "A ÁGUA SEGUE O SOL, A VIDA SEGUE A ÁGUA" — sequência parcial: Sol, Água, Vida...');
+        } else msg('Água segue o sol, vida segue a água.');
+      }
+      else if (id === 'tiles') { abrirPuzzleTiles(); }
+      else if (id === 'voltarAnte') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('antecamara'); UITabs.setActive('tabs', 'antecamara'); msg('De volta à antecâmara.'); });
+      }
+      else if (id === 'passagem_camara') {
+        if (state.get('tilesResolvido')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('camara'); UITabs.setActive('tabs', 'camara'); msg('A Câmara do Faraó. Ouro em toda parte. O altar aguarda a sequência da criação.'); });
+        } else msg('Ladrilhos-armadilha bloqueiam a passagem. Pise apenas nos seguros.');
+      }
+
+      // CÂMARA
+      else if (id === 'altar') { abrirPuzzleFinal(); }
+      else if (id === 'sarcofago') {
+        if (!state.get('sarcofago')) {
+          state.set('sarcofago', true);
+          msg('O sarcófago de ouro. A máscara mortuária brilha. Dentro, apenas linho e pó. O faraó partiu há muito.');
+        } else msg('Sarcófago vazio. O faraó já se foi.');
+      }
+      else if (id === 'fragmento3') {
+        if (!state.get('fragmento3')) {
+          state.set('fragmento3', true);
+          inv.add('frag3', '📜', 'Tábua: "terra embala a vida, fogo transforma tudo"');
+          msg('Tábua de pedra: "A TERRA EMBALA A VIDA, O FOGO TRANSFORMA TUDO" — ...Vida, Terra, Fogo. O fogo é o último!');
+        } else msg('Terra embala a vida, fogo transforma tudo.');
+      }
+      else if (id === 'voltarCorr') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('corredor'); UITabs.setActive('tabs', 'corredor'); msg('De volta ao corredor.'); });
+      }
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // Puzzle: Tiles no corredor — pisar nos que têm Vida(🌱)
+    function abrirPuzzleTiles() {
+      if (state.get('tilesResolvido')) { msg('Os ladrilhos seguros já foram revelados. Passagem aberta.'); return; }
+      const tileSymbols = ['☀','💀','🌱','🔥','🌱','💧','💀','🌱','🔥','☀','🌱','💨'];
+      const safeIndices = [2, 4, 7, 10]; // tiles com 🌱
+      let stepped = [];
+      let failed = false;
+      const html = `
+        <p style="color:${UITokens.get('colorAccent')}; margin-bottom:8px;">🏛️ Ladrilhos-Armadilha</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:14px;">Pise APENAS nos ladrilhos seguros para atravessar. Dica: qual símbolo representa segurança/vida?</p>
+        <div id="tileGrid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0;">
+          ${tileSymbols.map((s,i) => `<button class="tile-btn" data-idx="${i}" style="padding:16px; font-size:1.5rem; background:#1a1508; border:2px solid #3d3010; border-radius:4px; cursor:pointer; transition:all 0.2s;">${s}</button>`).join('')}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:12px;">
+          <button id="btnTileConfirm" style="padding:8px 20px; background:#1a1508; border:1px solid #d4a843; color:#d4a843; font-family:monospace; cursor:pointer; border-radius:4px;">✓ Atravessar</button>
+          <button id="btnTileVoltar" style="padding:8px 20px; background:#1a1508; border:1px solid #3d3010; color:#8a7a50; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.querySelectorAll('.tile-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx);
+            if (stepped.includes(idx)) { stepped = stepped.filter(i => i !== idx); btn.style.borderColor = '#3d3010'; btn.style.background = '#1a1508'; return; }
+            stepped.push(idx);
+            if (safeIndices.includes(idx)) { btn.style.borderColor = '#4caf50'; btn.style.background = '#1a2a10'; }
+            else { btn.style.borderColor = '#c62828'; btn.style.background = '#2a0a0a'; setTimeout(() => { btn.style.borderColor = '#3d3010'; btn.style.background = '#1a1508'; }, 600); stepped = stepped.filter(i => i !== idx); }
+          });
+        });
+        document.getElementById('btnTileConfirm').addEventListener('click', () => {
+          const correct = safeIndices.every(i => stepped.includes(i)) && stepped.every(i => safeIndices.includes(i));
+          if (correct) { state.set('tilesResolvido', true); UITabs.unlock('tabs', 'camara'); UIPanel.hide('puzzle-panel'); msg('✅ Apenas os ladrilhos de Vida (🌱) são seguros! A passagem para a Câmara do Faraó se abre!'); }
+          else { msg('❌ Ladrilho errado! As pedras tremem ameaçadoramente. Tente de novo — pise APENAS nos símbolos de Vida.'); }
+        });
+        document.getElementById('btnTileVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você recua dos ladrilhos.'); });
+      }, 50);
+    }
+
+    // Puzzle Final: sequência de 5 hieróglifos no altar
+    function abrirPuzzleFinal() {
+      if (state.get('puzzleFinal')) { msg('O altar já foi ativado. A pirâmide está aberta.'); return; }
+      const symbols = ['sol','lua','agua','fogo','terra','ar','vida','morte'];
+      const labels = { sol:'☀ Sol', lua:'🌙 Lua', agua:'💧 Água', fogo:'🔥 Fogo', terra:'🏔 Terra', ar:'💨 Ar', vida:'🌱 Vida', morte:'💀 Morte' };
+      const html = `
+        <p style="color:${UITokens.get('colorAccent')}; margin-bottom:8px;">⚱️ Altar da Criação — Sequência de 5 Hieróglifos</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:14px;">Insira os 5 hieróglifos do mito da criação na ordem correta.</p>
+        <div style="display:flex; flex-direction:column; gap:8px; margin:14px 0;">
+          ${[1,2,3,4,5].map(n => `<label style="color:#e8d8b0;">${n}º símbolo: <select id="sym${n}" style="background:#1a1508; border:1px solid #3d3010; color:#d4a843; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option>${symbols.map(s => `<option value="${s}">${labels[s]}</option>`).join('')}</select></label>`).join('')}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:12px;">
+          <button id="btnAltarOk" style="padding:8px 20px; background:#1a1508; border:1px solid #d4a843; color:#d4a843; font-family:monospace; cursor:pointer; border-radius:4px;">𓂀 Ativar Altar</button>
+          <button id="btnAltarVoltar" style="padding:8px 20px; background:#1a1508; border:1px solid #3d3010; color:#8a7a50; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('btnAltarOk').addEventListener('click', () => {
+          const seq = [1,2,3,4,5].map(n => document.getElementById('sym'+n).value);
+          if (seq.includes('')) { msg('Preencha todos os 5 símbolos.'); return; }
+          if (seq[0]==='sol' && seq[1]==='agua' && seq[2]==='vida' && seq[3]==='terra' && seq[4]==='fogo') {
+            state.set('puzzleFinal', true); UIPanel.hide('puzzle-panel'); escapar();
+          } else { msg('❌ O altar treme. Hieróglifos errados! A sequência do mito da criação exige reflexão: combine os 3 fragmentos.'); }
+        });
+        document.getElementById('btnAltarVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do altar.'); });
+      }, 50);
+    }
+
+    function escapar() { timer.stop(); UISuccessOverlay.show('success-overlay', { title: '𓂀 A PIRÂMIDE SE ABRE!', subtitle: 'Sol, Água, Vida, Terra, Fogo — o mito da criação completo. A parede desliza, revelando o deserto sob as estrelas.', time: timer.format(), links: [{ text: '← Voltar ao Lobby', href: '../index.html' }] }); }
+
+    input.onClick((x, y) => { if (EscapeTransitions.isTransitioning()) return; const obj = input.hitTest(x, y, getObjetos()); if (obj) interagir(obj); });
+
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'antecamara') renderAntecamara(ctx);
+      else if (amb === 'corredor') renderCorredor(ctx);
+      else renderCamara(ctx);
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
+      dust.update(dt); dust.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    function renderAntecamara(ctx) {
+      ctx.fillStyle = '#0d0a06'; ctx.fillRect(0, 0, 900, 600);
+      // Paredes de pedra
+      ctx.fillStyle = '#1a1508'; ctx.fillRect(0, 0, 900, 40); ctx.fillRect(0, 560, 900, 40);
+      ctx.fillStyle = '#12100a'; ctx.fillRect(0, 40, 40, 520); ctx.fillRect(860, 40, 40, 520);
+      // Hieróglifos decorativos nas paredes
+      ctx.fillStyle = '#3d3010'; ctx.font = '14px serif';
+      for (let i = 0; i < 15; i++) { ctx.fillText('𓀀𓁀𓂀𓃀', 60 + i * 55, 25); ctx.fillText('𓄀𓅀𓆀𓇀', 60 + i * 55, 580); }
+      // Pedra de Rosetta
+      ctx.fillStyle = '#2a2010'; ctx.fillRect(85, 85, 190, 270); ctx.strokeStyle = '#d4a843'; ctx.lineWidth = 2; ctx.strokeRect(85, 85, 190, 270);
+      ctx.fillStyle = '#d4a843'; ctx.font = '22px serif'; ctx.fillText('☀ = Sol', 110, 140); ctx.fillText('💧 = Água', 110, 180); ctx.fillText('🏔 = Terra', 110, 220); ctx.fillText('🌱 = Vida', 110, 260);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '11px monospace'; ctx.fillText('PEDRA DE ROSETTA', 110, 340);
+      // Tocha
+      if (!inv.has('tocha')) { ctx.fillStyle = '#4a3010'; ctx.fillRect(720, 55, 20, 150); ctx.fillStyle = '#d4a843'; ctx.beginPath(); ctx.arc(730, 50, 18, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ff6600'; ctx.beginPath(); ctx.arc(730, 45, 10, 0, Math.PI*2); ctx.fill(); }
+      // Fragmento de papiro
+      ctx.fillStyle = '#2a2410'; ctx.fillRect(355, 405, 190, 70); ctx.strokeStyle = '#5a4a20'; ctx.strokeRect(355, 405, 190, 70);
+      ctx.fillStyle = '#d4a843'; ctx.font = '10px monospace'; ctx.fillText('...começa com a luz...', 375, 445);
+      // Vasos
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = '#3a2a10'; ctx.beginPath(); ctx.arc(630 + i*30, 430, 15, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#d4a843'; ctx.beginPath(); ctx.arc(630 + i*30, 415, 8, 0, Math.PI*2); ctx.fill(); }
+      // Passagem
+      ctx.fillStyle = '#000'; ctx.fillRect(785, 255, 90, 190); ctx.strokeStyle = inv.has('tocha') ? '#d4a843' : '#1a1508'; ctx.lineWidth = 2; ctx.strokeRect(785, 255, 90, 190);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '10px monospace'; ctx.fillText('CORREDOR →', 795, 355); ctx.lineWidth = 1;
+    }
+
+    function renderCorredor(ctx) {
+      ctx.fillStyle = '#0d0a06'; ctx.fillRect(0, 0, 900, 600);
+      // Paredes estreitas — perspectiva
+      ctx.fillStyle = '#1a1508';
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(150,80); ctx.lineTo(150,520); ctx.lineTo(0,600); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(900,0); ctx.lineTo(750,80); ctx.lineTo(750,520); ctx.lineTo(900,600); ctx.fill();
+      // Chão de ladrilhos
+      ctx.fillStyle = '#12100a'; ctx.fillRect(150, 380, 600, 180);
+      ctx.strokeStyle = '#3d3010';
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) { ctx.strokeRect(155 + c*98, 385 + r*58, 95, 55); }
+      // Mural esquerdo
+      ctx.fillStyle = '#1a1a08'; ctx.fillRect(55, 55, 170, 240); ctx.strokeStyle = '#d4a843'; ctx.lineWidth = 1; ctx.strokeRect(55, 55, 170, 240);
+      ctx.fillStyle = '#d4a843'; ctx.font = '16px serif'; ctx.fillText('☀ ↔ 🌙', 100, 120); ctx.fillText('💧 ↔ 🔥', 100, 170);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '9px monospace'; ctx.fillText('OPOSTOS', 110, 270);
+      // Mural direito
+      ctx.fillStyle = '#1a1a08'; ctx.fillRect(675, 55, 170, 240); ctx.strokeStyle = '#d4a843'; ctx.strokeRect(675, 55, 170, 240);
+      ctx.fillStyle = '#d4a843'; ctx.font = '16px serif'; ctx.fillText('🏔 ↔ 💨', 720, 120); ctx.fillText('🌱 ↔ 💀', 720, 170);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '9px monospace'; ctx.fillText('OPOSTOS', 730, 270);
+      // Inscrição teto
+      ctx.fillStyle = '#3d3010'; ctx.fillRect(405, 105, 140, 50); ctx.fillStyle = '#d4a843'; ctx.font = '9px monospace'; ctx.fillText('água segue o sol...', 415, 130); ctx.fillText('vida segue a água...', 415, 145);
+      // Passagem câmara
+      ctx.fillStyle = state.get('tilesResolvido') ? '#1a1508' : '#000'; ctx.fillRect(785, 355, 90, 170);
+      ctx.strokeStyle = state.get('tilesResolvido') ? '#4caf50' : '#1a0a0a'; ctx.lineWidth = 2; ctx.strokeRect(785, 355, 90, 170);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '10px monospace'; ctx.fillText('CÂMARA →', 795, 445); ctx.lineWidth = 1;
+      // Voltar
+      ctx.fillStyle = '#1a1508'; ctx.fillRect(25, 525, 125, 45); ctx.strokeStyle = '#3d3010'; ctx.strokeRect(25, 525, 125, 45);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '11px monospace'; ctx.fillText('← Antecâm.', 40, 552);
+    }
+
+    function renderCamara(ctx) {
+      ctx.fillStyle = '#0d0a06'; ctx.fillRect(0, 0, 900, 600);
+      // Teto piramidal
+      ctx.fillStyle = '#1a1508';
+      ctx.beginPath(); ctx.moveTo(450, 10); ctx.lineTo(100, 120); ctx.lineTo(800, 120); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#3d3010'; ctx.beginPath(); ctx.moveTo(450, 10); ctx.lineTo(100, 120); ctx.lineTo(800, 120); ctx.closePath(); ctx.stroke();
+      // Paredes douradas
+      ctx.fillStyle = '#12100a'; ctx.fillRect(100, 120, 700, 460);
+      ctx.strokeStyle = '#3d3010';
+      for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.moveTo(100, 120 + i*60); ctx.lineTo(800, 120 + i*60); ctx.stroke(); }
+      // Hieróglifos decorativos
+      ctx.fillStyle = '#3d3010'; ctx.font = '12px serif';
+      for (let i = 0; i < 10; i++) { ctx.fillText('𓀀𓁀𓂀', 120 + i*65, 150); ctx.fillText('𓃀𓄀𓅀', 120 + i*65, 560); }
+      // Sarcófago dourado
+      ctx.fillStyle = '#2a2010'; ctx.fillRect(355, 55, 190, 125);
+      ctx.strokeStyle = '#d4a843'; ctx.lineWidth = 2; ctx.strokeRect(355, 55, 190, 125);
+      ctx.fillStyle = '#d4a843'; ctx.font = '28px serif'; ctx.fillText('𓂀', 430, 120);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '10px monospace'; ctx.fillText('SARCÓFAGO', 410, 170); ctx.lineWidth = 1;
+      // Altar central
+      ctx.fillStyle = '#1a1a08'; ctx.fillRect(285, 205, 330, 190);
+      ctx.strokeStyle = state.get('puzzleFinal') ? '#4caf50' : '#d4a843'; ctx.lineWidth = 2; ctx.strokeRect(285, 205, 330, 190);
+      // 5 encaixes no altar
+      for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(330 + i*60, 300, 20, 0, Math.PI*2); ctx.strokeStyle = '#d4a843'; ctx.stroke(); }
+      ctx.fillStyle = '#d4a843'; ctx.font = '11px monospace'; ctx.fillText('ALTAR DA CRIAÇÃO', 380, 380); ctx.lineWidth = 1;
+      // Fragmento 3
+      ctx.fillStyle = '#2a2410'; ctx.fillRect(655, 405, 140, 70); ctx.strokeStyle = '#5a4a20'; ctx.strokeRect(655, 405, 140, 70);
+      ctx.fillStyle = '#d4a843'; ctx.font = '9px monospace'; ctx.fillText('...terra embala a vida...', 665, 435); ctx.fillText('...fogo transforma...', 665, 455);
+      // Voltar
+      ctx.fillStyle = '#1a1508'; ctx.fillRect(25, 525, 125, 45); ctx.strokeStyle = '#3d3010'; ctx.strokeRect(25, 525, 125, 45);
+      ctx.fillStyle = '#8a7a50'; ctx.font = '11px monospace'; ctx.fillText('← Corredor', 40, 552);
+    }
+
+    game.start(); UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>

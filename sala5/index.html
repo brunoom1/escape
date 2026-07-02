@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 5 — O Submarino Afundado</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; background: #0a1628; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #1a3a5a; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/submarine.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+  <script>
+    UITokens.apply(ThemeSubmarine);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a1628' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'proa', flags: {
+      periscopio: false, mesa: false, armario: false, chaveColetada: false,
+      manual: false, painel: false,
+      valvAzul: false, valvVerm: false, valvAmar: false,
+      geradorAtivo: false, radioOk: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+    let waterLevel = 0;
+
+    UITabs.create('tabs', [
+      { id: 'proa', label: 'Proa', locked: false },
+      { id: 'maquinas', label: 'Máquinas', locked: true }
+    ], (tabId) => {
+      if (tabId === 'maquinas' && !state.get('chaveColetada')) { msg('Escotilha selada. Precisa da chave de manutenção.'); UITabs.setActive('tabs', 'proa'); return; }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId);
+        if (tabId === 'maquinas') msg('A sala de máquinas. Tubulações por toda parte. Três válvulas coloridas controlam o gerador.');
+        else msg('Compartimento de proa. A água sobe lentamente.');
+      });
+    });
+    UIMessageBox.create('message'); UIInventory.create('inventory'); UIPanel.create('puzzle-panel'); UISuccessOverlay.create('success-overlay');
+    const bubbles = EscapeParticles.create({ x: 0, y: 500, width: 900, height: 100, color: 'rgba(100,180,255,0.3)', count: 15, speedX: [-1,1], speedY: [-15,-5], size: [2,4], life: [2,5] });
+    function msg(t) { UIMessageBox.show('message', t); }
+    msg('O casco geme. Água infiltra pelas frestas. Você é o único acordado. A escotilha de emergência está na sala de máquinas.');
+    timer.start();
+
+    const objetosProa = [
+      { id: 'periscopio', x: 400, y: 30, w: 80, h: 150, label: 'Periscópio' },
+      { id: 'mesa', x: 100, y: 150, w: 200, h: 120, label: 'Mesa de navegação' },
+      { id: 'armario', x: 650, y: 100, w: 120, h: 200, label: 'Armário de suprimentos' },
+      { id: 'manual', x: 150, y: 350, w: 120, h: 80, label: 'Manual de emergência' },
+      { id: 'painelComm', x: 600, y: 350, w: 150, h: 100, label: 'Painel de comunicação' },
+      { id: 'escotilha', x: 780, y: 400, w: 80, h: 120, label: 'Escotilha → Máquinas' },
+    ];
+    const objetosMaquinas = [
+      { id: 'valvAzul', x: 100, y: 100, w: 100, h: 120, label: 'Válvula Azul' },
+      { id: 'valvVerm', x: 300, y: 100, w: 100, h: 120, label: 'Válvula Vermelha' },
+      { id: 'valvAmar', x: 500, y: 100, w: 100, h: 120, label: 'Válvula Amarela' },
+      { id: 'painelGer', x: 350, y: 320, w: 200, h: 100, label: 'Painel do gerador' },
+      { id: 'radio', x: 680, y: 120, w: 130, h: 120, label: 'Rádio de emergência' },
+      { id: 'escotilhaFuga', x: 700, y: 400, w: 120, h: 130, label: 'Escotilha de fuga' },
+      { id: 'voltarProa', x: 30, y: 500, w: 120, h: 50, label: '← Proa' },
+    ];
+    function getObjetos() { return state.getAmbiente() === 'proa' ? objetosProa : objetosMaquinas; }
+
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+      if (id === 'periscopio') { if (!state.get('periscopio')) { state.set('periscopio', true); msg('Superfície a 340 metros acima. Nenhum resgate à vista. A única saída é pela escotilha de máquinas.'); } else msg('340m de profundidade. Saída pelas máquinas.'); }
+      else if (id === 'mesa') { if (!state.get('mesa')) { state.set('mesa', true); inv.add('canal7', '🗺️', 'Carta náutica: Canal 7 marcado'); msg('Carta náutica com anotação a caneta: "Canal 7 — emergência". Uma frequência está circulada.'); } else msg('Canal 7 marcado na carta náutica.'); }
+      else if (id === 'armario') { if (!state.get('armario')) { state.set('armario', true); state.set('chaveColetada', true); inv.add('chave_maq', '🔑', 'Chave de manutenção — MÁQUINAS'); UITabs.unlock('tabs', 'maquinas'); msg('Fechadura enferrujada cede! Dentro: chave de manutenção com etiqueta "MÁQUINAS". Escotilha desbloqueada!'); } else msg('Armário vazio.'); }
+      else if (id === 'manual') { if (!state.get('manual')) { state.set('manual', true); inv.add('regra_pressao', '📖', 'Manual: válvulas em pressão CRESCENTE'); msg('Capítulo 9 — Reinício do Gerador: "Ativar válvulas na ordem de PRESSÃO CRESCENTE para evitar ruptura nas junções."'); } else msg('Válvulas: pressão crescente.'); }
+      else if (id === 'painelComm') { if (!state.get('painel')) { state.set('painel', true); inv.add('freq_147', '📡', 'Canal 7 = 147.3 MHz'); msg('Rádio com estática. Display: "Canal 7 = 147.3 MHz". Sem energia para transmitir daqui.'); } else msg('Canal 7 = 147.3 MHz. Sem energia.'); }
+      else if (id === 'escotilha') { if (state.get('chaveColetada')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('maquinas'); UITabs.setActive('tabs', 'maquinas'); msg('A sala de máquinas. Três válvulas coloridas. Manômetros indicam pressão.'); }); } else msg('Selada. Precisa da chave de manutenção.'); }
+      // MÁQUINAS
+      else if (id === 'valvAzul') { if (!state.get('valvAzul')) { state.set('valvAzul', true); inv.add('psi12', '🔵', 'Válvula azul: 12 PSI'); msg('Válvula azul. Manômetro acoplado indica: 12 PSI.'); } else msg('Válvula azul: 12 PSI.'); }
+      else if (id === 'valvVerm') { if (!state.get('valvVerm')) { state.set('valvVerm', true); inv.add('psi45', '🔴', 'Válvula vermelha: 45 PSI'); msg('Válvula vermelha. Manômetro: 45 PSI.'); } else msg('Válvula vermelha: 45 PSI.'); }
+      else if (id === 'valvAmar') { if (!state.get('valvAmar')) { state.set('valvAmar', true); inv.add('psi78', '🟡', 'Válvula amarela: 78 PSI'); msg('Válvula amarela. Manômetro: 78 PSI.'); } else msg('Válvula amarela: 78 PSI.'); }
+      else if (id === 'painelGer') { abrirPainelGerador(); }
+      else if (id === 'radio') { if (!state.get('radioOk')) { state.set('radioOk', true); msg('Rádio funcional! Ajusta para 147.3 MHz... Estática... "K-47, resgate a caminho. Aguentem." Recebido!'); } else msg('Resgate confirmado em 147.3 MHz.'); }
+      else if (id === 'escotilhaFuga') { if (state.get('geradorAtivo')) { escapar(); } else msg('Selada eletronicamente. O gerador precisa estar online.'); }
+      else if (id === 'voltarProa') { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('proa'); UITabs.setActive('tabs', 'proa'); msg('De volta à proa.'); }); }
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    function abrirPainelGerador() {
+      if (state.get('geradorAtivo')) { msg('Gerador já online. Escotilha desbloqueada.'); return; }
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">⚙️ Painel do Gerador — Ordem de ativação das válvulas</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:14px;">Selecione a ordem correta (pressão crescente):</p>
+        <div style="display:flex; flex-direction:column; gap:8px; margin:14px 0;">
+          <label style="color:#b0d4e8;">1ª válvula: <select id="v1" style="background:#0c1a2e; border:1px solid #1a3a5a; color:#4fc3f7; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option><option value="azul">🔵 Azul</option><option value="vermelha">🔴 Vermelha</option><option value="amarela">🟡 Amarela</option></select></label>
+          <label style="color:#b0d4e8;">2ª válvula: <select id="v2" style="background:#0c1a2e; border:1px solid #1a3a5a; color:#4fc3f7; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option><option value="azul">🔵 Azul</option><option value="vermelha">🔴 Vermelha</option><option value="amarela">🟡 Amarela</option></select></label>
+          <label style="color:#b0d4e8;">3ª válvula: <select id="v3" style="background:#0c1a2e; border:1px solid #1a3a5a; color:#4fc3f7; padding:6px; font-family:monospace; border-radius:4px;"><option value="">—</option><option value="azul">🔵 Azul</option><option value="vermelha">🔴 Vermelha</option><option value="amarela">🟡 Amarela</option></select></label>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button id="btnAtivar" style="padding:8px 20px; background:#0e1e35; border:1px solid #4fc3f7; color:#4fc3f7; font-family:monospace; cursor:pointer; border-radius:4px;">⚡ Ativar</button>
+          <button id="btnVoltar" style="padding:8px 20px; background:#0e1e35; border:1px solid #1a3a5a; color:#b0d4e8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('btnAtivar').addEventListener('click', () => {
+          const seq = [document.getElementById('v1').value, document.getElementById('v2').value, document.getElementById('v3').value];
+          if (seq.includes('')) { msg('Selecione as 3 válvulas.'); return; }
+          if (seq[0]==='azul' && seq[1]==='vermelha' && seq[2]==='amarela') {
+            state.set('geradorAtivo', true); UIPanel.hide('puzzle-panel');
+            msg('✅ Sequência correta! O gerador ronca e ganha vida. Luzes acendem. Escotilha de fuga desbloqueada!');
+          } else { msg('❌ ALERTA: Pressão desbalanceada! Válvulas resetadas. Tente novamente na ordem correta.'); }
+        });
+        document.getElementById('btnVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do painel.'); });
+      }, 50);
+    }
+
+    function escapar() { timer.stop(); UISuccessOverlay.show('success-overlay', { title: '🚢 ESCOTILHA ABERTA!', subtitle: 'O gerador ronca. A escotilha cede. Você escapa para a câmara de resgate. O K-47 não levou todos.', time: timer.format(), links: [{ text: '← Voltar ao Lobby', href: '../index.html' }] }); }
+
+    input.onClick((x, y) => { if (EscapeTransitions.isTransitioning()) return; const obj = input.hitTest(x, y, getObjetos()); if (obj) interagir(obj); });
+
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'proa') renderProa(ctx); else renderMaquinas(ctx);
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) { if (hovered && hovered.id === obj.id) { ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2; ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12; ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore(); } }
+      // Água subindo
+      waterLevel = Math.min(180, waterLevel + 0.15 * dt);
+      ctx.fillStyle = 'rgba(20, 60, 140, 0.35)'; ctx.fillRect(0, 600 - waterLevel, 900, waterLevel);
+      bubbles.update(dt); bubbles.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    function renderProa(ctx) {
+      ctx.fillStyle = '#0e1e35'; ctx.fillRect(0, 0, 900, 600);
+      // Casco metálico
+      ctx.strokeStyle = '#1a3a5a'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(0, 120*i); ctx.lineTo(900, 120*i); ctx.stroke(); }
+      // Rebites
+      for (let i = 0; i < 20; i++) { ctx.fillStyle = '#2a4a6a'; ctx.beginPath(); ctx.arc(50+i*45, 20, 3, 0, Math.PI*2); ctx.fill(); }
+      // Periscópio
+      ctx.fillStyle = '#1a2a3a'; ctx.fillRect(420, 35, 40, 140); ctx.fillStyle = '#2a4a6a'; ctx.fillRect(410, 35, 60, 20);
+      // Mesa navegação
+      ctx.fillStyle = '#1a2a1a'; ctx.fillRect(105, 155, 190, 110); ctx.strokeStyle = '#2a4a3a'; ctx.strokeRect(105, 155, 190, 110);
+      ctx.fillStyle = '#4a7a5a'; ctx.font = '9px monospace'; ctx.fillText('CARTA NÁUTICA', 140, 200);
+      // Armário
+      ctx.fillStyle = '#1a1a2a'; ctx.fillRect(655, 105, 110, 190); ctx.strokeStyle = '#3a3a5a'; ctx.strokeRect(655, 105, 110, 190);
+      // Manual
+      ctx.fillStyle = '#2a2a1a'; ctx.fillRect(155, 355, 110, 70); ctx.strokeStyle = '#5a5a3a'; ctx.strokeRect(155, 355, 110, 70);
+      ctx.fillStyle = '#aaa'; ctx.font = '9px monospace'; ctx.fillText('MANUAL EMERG.', 163, 395);
+      // Painel comm
+      ctx.fillStyle = '#0a1520'; ctx.fillRect(605, 355, 140, 90); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(605, 355, 140, 90);
+      ctx.fillStyle = '#4fc3f7'; ctx.font = '9px monospace'; ctx.fillText('147.3 MHz', 635, 405);
+      // Escotilha
+      ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(820, 460, 40, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = state.get('chaveColetada') ? '#4fc3f7' : '#333'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(820, 460, 40, 0, Math.PI*2); ctx.stroke(); ctx.lineWidth = 1;
+    }
+
+    function renderMaquinas(ctx) {
+      ctx.fillStyle = '#0c1a2e'; ctx.fillRect(0, 0, 900, 600);
+      // Tubulações
+      ctx.strokeStyle = '#2a4a6a'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(150, 230); ctx.lineTo(150, 320); ctx.lineTo(750, 320); ctx.lineTo(750, 230); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(350, 230); ctx.lineTo(350, 320); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(550, 230); ctx.lineTo(550, 320); ctx.stroke(); ctx.lineWidth = 1;
+      // Válvulas
+      const valvulas = [{x:100,y:100,cor:'#1565c0',label:'AZUL'},{x:300,y:100,cor:'#c62828',label:'VERM'},{x:500,y:100,cor:'#f9a825',label:'AMAR'}];
+      valvulas.forEach(v => {
+        ctx.fillStyle = '#0a1a2a'; ctx.fillRect(v.x, v.y, 100, 120); ctx.strokeStyle = v.cor; ctx.lineWidth = 2; ctx.strokeRect(v.x, v.y, 100, 120);
+        ctx.beginPath(); ctx.arc(v.x+50, v.y+50, 25, 0, Math.PI*2); ctx.strokeStyle = v.cor; ctx.stroke();
+        ctx.fillStyle = v.cor; ctx.font = '10px monospace'; ctx.fillText(v.label, v.x+35, v.y+110); ctx.lineWidth = 1;
+      });
+      // Painel gerador
+      ctx.fillStyle = '#0a2a1a'; ctx.fillRect(355, 325, 190, 90); ctx.strokeStyle = state.get('geradorAtivo') ? '#00ff88' : '#1a3a5a'; ctx.lineWidth = 2; ctx.strokeRect(355, 325, 190, 90);
+      ctx.fillStyle = state.get('geradorAtivo') ? '#00ff88' : '#4a7a9a'; ctx.font = '12px monospace'; ctx.fillText(state.get('geradorAtivo') ? 'ONLINE' : 'OFFLINE', 410, 375); ctx.lineWidth = 1;
+      // Rádio
+      ctx.fillStyle = '#1a1a0a'; ctx.fillRect(685, 125, 120, 110); ctx.strokeStyle = '#3a3a2a'; ctx.strokeRect(685, 125, 120, 110);
+      ctx.fillStyle = '#4fc3f7'; ctx.font = '9px monospace'; ctx.fillText('RADIO EMERG.', 700, 185);
+      // Escotilha fuga
+      ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(760, 465, 50, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = state.get('geradorAtivo') ? '#00ff88' : '#333'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(760, 465, 50, 0, Math.PI*2); ctx.stroke(); ctx.lineWidth = 1;
+      ctx.fillStyle = '#4a7a9a'; ctx.font = '10px monospace'; ctx.fillText('FUGA', 742, 470);
+      // Voltar
+      ctx.fillStyle = '#0e1e35'; ctx.fillRect(35, 505, 115, 45); ctx.strokeStyle = '#1a3a5a'; ctx.strokeRect(35, 505, 115, 45);
+      ctx.fillStyle = '#4a7a9a'; ctx.font = '11px monospace'; ctx.fillText('← Proa', 60, 532);
+    }
+
+    game.start(); UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>

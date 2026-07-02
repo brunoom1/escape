@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 6 — O Museu à Noite</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Georgia', serif; background: #0a0a0f; color: #d4cfc0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #2a2035; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/museum.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+  <script>
+    UITokens.apply(ThemeMuseum);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a0a0f' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'galeria', flags: {
+      quadroModerno: false, quadroClassico: false, escultura: false, placaInfo: false,
+      diagramaCircuito: false, monitorCams: false, painelSensores: false,
+      sensor1: false, sensor2: false, sensor3: false, sensor4: false,
+      laserDesativado: false, crachaColetado: false,
+      sarcofago: false, hieroglifos: false, muralCores: false,
+      overrideCompleto: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+    let laserPulse = 0;
+    let sensorOrdem = [];
+
+    UITabs.create('tabs', [
+      { id: 'galeria', label: 'Galeria Principal', locked: false },
+      { id: 'seguranca', label: 'Sala de Segurança', locked: true },
+      { id: 'egipcia', label: 'Ala Egípcia', locked: true }
+    ], (tabId) => {
+      if (tabId === 'seguranca' && !state.get('crachaColetado')) { msg('Porta com leitor de crachá. Você precisa do crachá de segurança.'); UITabs.setActive('tabs', 'galeria'); return; }
+      if (tabId === 'egipcia' && !state.get('laserDesativado')) { msg('Corredor bloqueado por lasers. Desative os sensores primeiro.'); UITabs.setActive('tabs', state.getAmbiente()); return; }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId);
+        if (tabId === 'galeria') msg('Galeria Principal. Obras iluminadas por vitrines. Lasers de segurança cortam o espaço.');
+        else if (tabId === 'seguranca') msg('Sala de Segurança. Monitores, diagrama de circuitos e painel de controle dos sensores.');
+        else msg('Ala Egípcia. Sarcófagos, hieróglifos e um terminal de override.');
+      });
+    });
+    UIMessageBox.create('message'); UIInventory.create('inventory'); UIPanel.create('puzzle-panel'); UISuccessOverlay.create('success-overlay');
+    const dustParticles = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(232,184,74,0.15)', count: 20, speedX: [-0.5,0.5], speedY: [0.2,1], size: [1,2], life: [4,8] });
+    function msg(t) { UIMessageBox.show('message', t); }
+    msg('O alarme disparou. As portas selaram. Você, segurança noturno, está preso. Os lasers bloqueiam as saídas. Encontre um jeito de desativar o sistema.');
+    timer.start();
+
+    // === OBJETOS POR AMBIENTE ===
+    const objetosGaleria = [
+      { id: 'quadroModerno', x: 60, y: 50, w: 160, h: 200, label: 'Quadro "Noite Estrelada" (1889)', blockedBy: null },
+      { id: 'quadroClassico', x: 360, y: 50, w: 160, h: 200, label: 'Quadro "O Grito" (1893)', blockedBy: null },
+      { id: 'escultura', x: 680, y: 120, w: 100, h: 200, label: 'Escultura de mármore', blockedBy: 'laserA' },
+      { id: 'placaInfo', x: 250, y: 380, w: 140, h: 60, label: 'Placa informativa', blockedBy: null },
+      { id: 'portaSeguranca', x: 750, y: 400, w: 120, h: 150, label: 'Porta → Segurança', blockedBy: null },
+      { id: 'corredorEgipcio', x: 30, y: 420, w: 130, h: 130, label: 'Corredor → Ala Egípcia', blockedBy: null },
+    ];
+    const objetosSeguranca = [
+      { id: 'diagramaCircuito', x: 50, y: 50, w: 250, h: 200, label: 'Diagrama de circuito' },
+      { id: 'monitorCams', x: 400, y: 50, w: 200, h: 150, label: 'Monitores de câmera' },
+      { id: 'painelSensores', x: 350, y: 320, w: 200, h: 140, label: 'Painel de sensores' },
+      { id: 'voltarGaleria', x: 30, y: 520, w: 130, h: 50, label: '← Galeria' },
+    ];
+    const objetosEgipcia = [
+      { id: 'sarcofago', x: 80, y: 100, w: 150, h: 250, label: 'Sarcófago dourado' },
+      { id: 'hieroglifos', x: 350, y: 80, w: 200, h: 180, label: 'Parede de hieróglifos' },
+      { id: 'muralCores', x: 650, y: 100, w: 150, h: 160, label: 'Mural de cores rituais' },
+      { id: 'terminalOverride', x: 350, y: 380, w: 200, h: 120, label: 'Terminal de Override' },
+      { id: 'voltarGaleriaEg', x: 30, y: 520, w: 130, h: 50, label: '← Galeria' },
+    ];
+    function getObjetos() {
+      const amb = state.getAmbiente();
+      if (amb === 'galeria') return objetosGaleria;
+      if (amb === 'seguranca') return objetosSeguranca;
+      return objetosEgipcia;
+    }
+
+    // === INTERAÇÕES ===
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+
+      // Check laser blocking
+      if (obj.blockedBy && !state.get('laserDesativado')) {
+        msg('⚠️ Um laser de segurança bloqueia o acesso. Desative os sensores primeiro.');
+        return;
+      }
+
+      // --- GALERIA PRINCIPAL ---
+      if (id === 'quadroModerno') {
+        if (!state.get('quadroModerno')) { state.set('quadroModerno', true); inv.add('data1889', '🖼️', 'Placa: "Noite Estrelada, 1889"'); msg('Uma reprodução magnífica. A placa diz: "Noite Estrelada — Vincent van Gogh, 1889". O ano está gravado em dourado.'); }
+        else msg('Noite Estrelada, 1889.');
+      }
+      else if (id === 'quadroClassico') {
+        if (!state.get('quadroClassico')) { state.set('quadroClassico', true); inv.add('data1893', '🖼️', 'Placa: "O Grito, 1893"'); msg('O rosto contorcido parece gritar no escuro. Placa: "O Grito — Edvard Munch, 1893".'); }
+        else msg('O Grito, 1893.');
+      }
+      else if (id === 'escultura') {
+        if (!state.get('escultura')) { state.set('escultura', true); state.set('crachaColetado', true); inv.add('cracha', '🪪', 'Crachá de segurança — Acesso total'); UITabs.unlock('tabs', 'seguranca'); msg('Atrás da escultura, preso ao pedestal: um crachá de segurança! "ACESSO TOTAL — Sala de Segurança". A porta agora pode ser aberta.'); }
+        else msg('Pedestal vazio. O crachá já é seu.');
+      }
+      else if (id === 'placaInfo') {
+        if (!state.get('placaInfo')) { state.set('placaInfo', true); inv.add('dica_media', '📜', '"A verdade está entre os mestres"'); msg('"Curiosidade: a verdade está entre os mestres. O ponto médio de suas eras revela o caminho." Uma dica críptica...'); }
+        else msg('"A verdade está entre os mestres."');
+      }
+      else if (id === 'portaSeguranca') {
+        if (state.get('crachaColetado')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('seguranca'); UITabs.setActive('tabs', 'seguranca'); msg('Sala de Segurança. Monitores piscam. Um diagrama de circuitos na parede e o painel central de sensores.'); }); }
+        else msg('Porta com leitor de crachá. Precisa do crachá de segurança.');
+      }
+      else if (id === 'corredorEgipcio') {
+        if (state.get('laserDesativado')) { EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('egipcia'); UITabs.setActive('tabs', 'egipcia'); msg('Ala Egípcia. Sarcófagos dourados, hieróglifos e um terminal de override no fundo.'); }); }
+        else msg('Corredor bloqueado por lasers vermelhos. Desative os sensores na Sala de Segurança.');
+      }
+      // --- SALA DE SEGURANÇA ---
+      else if (id === 'diagramaCircuito') {
+        if (!state.get('diagramaCircuito')) { state.set('diagramaCircuito', true); inv.add('ordem_circuito', '📐', 'Circuito: S1 alimenta S3, S3 alimenta S2, S2 alimenta S4'); msg('Diagrama de dependência dos sensores: S1 → S3 → S2 → S4. Cada sensor só pode ser desativado quando o anterior na cadeia está off. A ordem importa!'); }
+        else msg('Cadeia: S1 → S3 → S2 → S4.');
+      }
+      else if (id === 'monitorCams') {
+        if (!state.get('monitorCams')) { state.set('monitorCams', true); msg('Câmeras mostram: Galeria com lasers ativos, corredor bloqueado, Ala Egípcia isolada. Quatro sensores estão marcados S1-S4 no mapa.'); }
+        else msg('Câmeras: lasers' + (state.get('laserDesativado') ? ' desativados.' : ' ativos em toda parte.'));
+      }
+      else if (id === 'painelSensores') { abrirPainelSensores(); }
+      else if (id === 'voltarGaleria') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('galeria'); UITabs.setActive('tabs', 'galeria'); msg('De volta à Galeria Principal.'); });
+      }
+      // --- ALA EGÍPCIA ---
+      else if (id === 'sarcofago') {
+        if (!state.get('sarcofago')) { state.set('sarcofago', true); inv.add('escaravelho', '🪲', 'Escaravelho dourado — símbolo de renascimento'); msg('O sarcófago se abre levemente. Dentro, um escaravelho dourado com inscrições. Símbolo de renascimento e passagem.'); }
+        else msg('O sarcófago está vazio. O escaravelho é seu.');
+      }
+      else if (id === 'hieroglifos') {
+        if (!state.get('hieroglifos')) { state.set('hieroglifos', true); inv.add('sequencia_hiero', '𓂀', 'Hieróglifos: "Ouro do sol, Azul do Nilo, Vermelho do fogo"'); msg('Os hieróglifos narram um ritual: "Primeiro o Ouro do sol nasce, depois o Azul do Nilo flui, e por fim o Vermelho do fogo consome." Uma sequência de cores.'); }
+        else msg('Ritual: Ouro → Azul → Vermelho.');
+      }
+      else if (id === 'muralCores') {
+        if (!state.get('muralCores')) { state.set('muralCores', true); inv.add('cores_ritual', '🎨', 'Mural: três círculos — dourado, azul, vermelho'); msg('Um mural com três círculos alinhados: dourado, azul e vermelho. Abaixo, o símbolo de um escaravelho com asas abertas.'); }
+        else msg('Três cores: dourado, azul, vermelho.');
+      }
+      else if (id === 'terminalOverride') { abrirTerminalOverride(); }
+      else if (id === 'voltarGaleriaEg') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('galeria'); UITabs.setActive('tabs', 'galeria'); msg('De volta à Galeria Principal.'); });
+      }
+
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // === PAINEL DE SENSORES ===
+    function abrirPainelSensores() {
+      if (state.get('laserDesativado')) { msg('Sensores já desativados. Lasers offline.'); return; }
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🔴 Painel de Sensores — Desativação em cadeia</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:10px;">Desative na ordem de dependência do circuito. Cada botão desliga um sensor.</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:14px;">Ordem atual: ${sensorOrdem.length > 0 ? sensorOrdem.join(' → ') : '(nenhum)'}</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;">
+          <button class="btn-sensor" data-sensor="S1" style="padding:12px; background:${state.get('sensor1')?'#1a2a1a':'#1a0a0a'}; border:2px solid ${state.get('sensor1')?'#4caf50':'#ff1a1a'}; color:${state.get('sensor1')?'#4caf50':'#ff1a1a'}; font-family:monospace; cursor:pointer; border-radius:4px; font-size:1rem;">${state.get('sensor1')?'✅ S1 OFF':'🔴 S1 ON'}</button>
+          <button class="btn-sensor" data-sensor="S2" style="padding:12px; background:${state.get('sensor2')?'#1a2a1a':'#1a0a0a'}; border:2px solid ${state.get('sensor2')?'#4caf50':'#ff1a1a'}; color:${state.get('sensor2')?'#4caf50':'#ff1a1a'}; font-family:monospace; cursor:pointer; border-radius:4px; font-size:1rem;">${state.get('sensor2')?'✅ S2 OFF':'🔴 S2 ON'}</button>
+          <button class="btn-sensor" data-sensor="S3" style="padding:12px; background:${state.get('sensor3')?'#1a2a1a':'#1a0a0a'}; border:2px solid ${state.get('sensor3')?'#4caf50':'#ff1a1a'}; color:${state.get('sensor3')?'#4caf50':'#ff1a1a'}; font-family:monospace; cursor:pointer; border-radius:4px; font-size:1rem;">${state.get('sensor3')?'✅ S3 OFF':'🔴 S3 ON'}</button>
+          <button class="btn-sensor" data-sensor="S4" style="padding:12px; background:${state.get('sensor4')?'#1a2a1a':'#1a0a0a'}; border:2px solid ${state.get('sensor4')?'#4caf50':'#ff1a1a'}; color:${state.get('sensor4')?'#4caf50':'#ff1a1a'}; font-family:monospace; cursor:pointer; border-radius:4px; font-size:1rem;">${state.get('sensor4')?'✅ S4 OFF':'🔴 S4 ON'}</button>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
+          <button id="btnResetSensores" style="padding:8px 20px; background:#1a0a0a; border:1px solid #ff1a1a; color:#ff1a1a; font-family:monospace; cursor:pointer; border-radius:4px;">↺ Reset</button>
+          <button id="btnVoltarSensores" style="padding:8px 20px; background:#12101a; border:1px solid #2a2035; color:#d4cfc0; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        const ordemCorreta = ['S1','S3','S2','S4'];
+        document.querySelectorAll('.btn-sensor').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const s = btn.dataset.sensor;
+            if (state.get('sensor' + s.charAt(1))) return; // já desativado
+            sensorOrdem.push(s);
+            const idx = sensorOrdem.length - 1;
+            if (sensorOrdem[idx] !== ordemCorreta[idx]) {
+              msg('❌ Curto-circuito! Sensor ' + s + ' não pode ser desativado agora. O painel resetou.');
+              sensorOrdem = [];
+              state.set('sensor1', false); state.set('sensor2', false); state.set('sensor3', false); state.set('sensor4', false);
+              abrirPainelSensores();
+              return;
+            }
+            state.set('sensor' + s.charAt(1), true);
+            msg('✓ Sensor ' + s + ' desativado.');
+            if (sensorOrdem.length === 4) {
+              state.set('laserDesativado', true); UITabs.unlock('tabs', 'egipcia'); UIPanel.hide('puzzle-panel');
+              msg('✅ Todos os sensores desativados! Lasers offline. O corredor para a Ala Egípcia está livre. A escultura na galeria também está acessível.');
+            } else { abrirPainelSensores(); }
+          });
+        });
+        document.getElementById('btnResetSensores').addEventListener('click', () => {
+          sensorOrdem = [];
+          state.set('sensor1', false); state.set('sensor2', false); state.set('sensor3', false); state.set('sensor4', false);
+          msg('Painel resetado. Todos sensores re-ativados.');
+          abrirPainelSensores();
+        });
+        document.getElementById('btnVoltarSensores').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do painel.'); });
+      }, 50);
+    }
+
+    // === TERMINAL OVERRIDE (ALA EGÍPCIA) ===
+    function abrirTerminalOverride() {
+      if (state.get('overrideCompleto')) { msg('Sistema já desbloqueado. A saída está livre.'); return; }
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:10px;">𓂀 Terminal de Override — Sequência de Desbloqueio</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:8px;">Passo 1: Insira o código numérico de acesso (4 dígitos)</p>
+        <div style="display:flex; gap:8px; justify-content:center; margin:10px 0;">
+          <input id="codigoInput" type="text" maxlength="4" placeholder="____" style="width:120px; text-align:center; padding:10px; background:#0a0a0f; border:2px solid #e8b84a; color:#e8b84a; font-family:monospace; font-size:1.4rem; border-radius:4px; letter-spacing:8px;" />
+        </div>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin:12px 0 8px;">Passo 2: Sequência de cores do ritual (selecione em ordem)</p>
+        <div style="display:flex; gap:12px; justify-content:center; margin:10px 0;">
+          <button class="btn-cor" data-cor="gold" style="width:50px;height:50px;border-radius:50%;background:#e8b84a;border:3px solid #0a0a0f;cursor:pointer;" title="Dourado"></button>
+          <button class="btn-cor" data-cor="blue" style="width:50px;height:50px;border-radius:50%;background:#1565c0;border:3px solid #0a0a0f;cursor:pointer;" title="Azul"></button>
+          <button class="btn-cor" data-cor="red" style="width:50px;height:50px;border-radius:50%;background:#c62828;border:3px solid #0a0a0f;cursor:pointer;" title="Vermelho"></button>
+        </div>
+        <p id="seqCoresDisplay" style="color:#e8b84a; text-align:center; font-family:monospace; margin:6px 0; min-height:20px;"></p>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:14px;">
+          <button id="btnOverride" style="padding:8px 20px; background:#1a1a0a; border:1px solid #e8b84a; color:#e8b84a; font-family:monospace; cursor:pointer; border-radius:4px;">⚡ Executar Override</button>
+          <button id="btnResetOverride" style="padding:8px 20px; background:#1a0a0a; border:1px solid #c62828; color:#c62828; font-family:monospace; cursor:pointer; border-radius:4px;">↺ Reset</button>
+          <button id="btnVoltarOverride" style="padding:8px 20px; background:#12101a; border:1px solid #2a2035; color:#d4cfc0; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      let seqCores = [];
+      const corNomes = { gold: '🟡', blue: '🔵', red: '🔴' };
+      setTimeout(() => {
+        document.querySelectorAll('.btn-cor').forEach(btn => {
+          btn.addEventListener('click', () => {
+            if (seqCores.length >= 3) return;
+            seqCores.push(btn.dataset.cor);
+            document.getElementById('seqCoresDisplay').textContent = seqCores.map(c => corNomes[c]).join(' → ');
+          });
+        });
+        document.getElementById('btnOverride').addEventListener('click', () => {
+          const codigo = document.getElementById('codigoInput').value.trim();
+          if (codigo.length !== 4) { msg('Insira um código de 4 dígitos.'); return; }
+          if (seqCores.length !== 3) { msg('Selecione 3 cores na ordem do ritual.'); return; }
+          const codigoCorreto = codigo === '1891';
+          const coresCorretas = seqCores[0]==='gold' && seqCores[1]==='blue' && seqCores[2]==='red';
+          if (codigoCorreto && coresCorretas) {
+            state.set('overrideCompleto', true); UIPanel.hide('puzzle-panel');
+            escapar();
+          } else if (!codigoCorreto && !coresCorretas) {
+            msg('❌ Código incorreto E sequência de cores errada. Terminal resetado.');
+            seqCores = []; document.getElementById('seqCoresDisplay').textContent = '';
+          } else if (!codigoCorreto) {
+            msg('❌ Código numérico incorreto. Pense no que as datas dos quadros significam juntas...');
+            seqCores = []; document.getElementById('seqCoresDisplay').textContent = '';
+          } else {
+            msg('❌ Sequência de cores incorreta. Releia os hieróglifos sobre o ritual.');
+            seqCores = []; document.getElementById('seqCoresDisplay').textContent = '';
+          }
+        });
+        document.getElementById('btnResetOverride').addEventListener('click', () => {
+          seqCores = []; document.getElementById('seqCoresDisplay').textContent = '';
+          document.getElementById('codigoInput').value = '';
+          msg('Terminal resetado.');
+        });
+        document.getElementById('btnVoltarOverride').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do terminal.'); });
+      }, 50);
+    }
+
+    // === ESCAPE ===
+    function escapar() { timer.stop(); UISuccessOverlay.show('success-overlay', { title: '🏛️ MUSEU DESBLOQUEADO!', subtitle: 'O override é aceito. As portas de emergência se abrem com um clique. O ar frio da noite invade o museu. Você está livre.', time: timer.format(), links: [{ text: '← Voltar ao Lobby', href: '../index.html' }] }); }
+
+    // === INPUT ===
+    input.onClick((x, y) => { if (EscapeTransitions.isTransitioning()) return; const obj = input.hitTest(x, y, getObjetos()); if (obj) interagir(obj); });
+
+    // === RENDER ===
+    game.onRender((ctx, dt, size) => {
+      laserPulse += dt * 3;
+      const amb = state.getAmbiente();
+      if (amb === 'galeria') renderGaleria(ctx);
+      else if (amb === 'seguranca') renderSeguranca(ctx);
+      else renderEgipcia(ctx);
+
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) {
+        if (hovered && hovered.id === obj.id) {
+          ctx.save(); ctx.strokeStyle = UITokens.get('glowColor'); ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor'); ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h); ctx.restore();
+        }
+      }
+      dustParticles.update(dt); dustParticles.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    // === RENDER GALERIA ===
+    function renderGaleria(ctx) {
+      ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, 900, 600);
+      // Piso de mármore
+      ctx.fillStyle = '#15131a'; ctx.fillRect(0, 500, 900, 100);
+      for (let i = 0; i < 10; i++) { ctx.strokeStyle = '#1e1a25'; ctx.beginPath(); ctx.moveTo(i*90, 500); ctx.lineTo(i*90, 600); ctx.stroke(); }
+      // Paredes
+      ctx.fillStyle = '#12101a'; ctx.fillRect(0, 0, 900, 500);
+      ctx.strokeStyle = '#2a2035'; ctx.beginPath(); ctx.moveTo(0, 500); ctx.lineTo(900, 500); ctx.stroke();
+
+      // Quadro Moderno (1889)
+      ctx.fillStyle = '#1a1828'; ctx.fillRect(65, 55, 150, 190);
+      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 3; ctx.strokeRect(65, 55, 150, 190); ctx.lineWidth = 1;
+      // Vitrine glow
+      ctx.fillStyle = 'rgba(232,184,74,0.08)'; ctx.fillRect(55, 45, 170, 210);
+      ctx.fillStyle = '#1a237e'; ctx.fillRect(75, 65, 130, 130);
+      ctx.fillStyle = '#ffeb3b'; for (let i=0;i<8;i++){ctx.beginPath();ctx.arc(90+i*16, 100+Math.sin(i)*20, 3, 0, Math.PI*2);ctx.fill();}
+      ctx.fillStyle = '#d4cfc0'; ctx.font = '10px Georgia'; ctx.fillText('1889', 125, 235);
+
+      // Quadro Clássico (1893)
+      ctx.fillStyle = '#1a1828'; ctx.fillRect(365, 55, 150, 190);
+      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 3; ctx.strokeRect(365, 55, 150, 190); ctx.lineWidth = 1;
+      ctx.fillStyle = 'rgba(232,184,74,0.08)'; ctx.fillRect(355, 45, 170, 210);
+      ctx.fillStyle = '#ff6f00'; ctx.fillRect(375, 65, 130, 130);
+      ctx.fillStyle = '#263238'; ctx.beginPath(); ctx.ellipse(440, 120, 20, 30, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#d4cfc0'; ctx.font = '10px Georgia'; ctx.fillText('1893', 425, 235);
+
+      // Escultura
+      ctx.fillStyle = '#2a2535'; ctx.fillRect(700, 280, 60, 40); // pedestal
+      ctx.fillStyle = '#3a3545'; ctx.beginPath(); ctx.ellipse(730, 200, 30, 80, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#4a4555'; ctx.beginPath(); ctx.ellipse(730, 200, 30, 80, 0, 0, Math.PI*2); ctx.stroke();
+
+      // Placa informativa
+      ctx.fillStyle = '#1a1a12'; ctx.fillRect(255, 385, 130, 50);
+      ctx.strokeStyle = '#3a3a2a'; ctx.strokeRect(255, 385, 130, 50);
+      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('INFORMAÇÕES', 278, 415);
+
+      // Porta segurança
+      ctx.fillStyle = '#1a1520'; ctx.fillRect(755, 405, 110, 140);
+      ctx.strokeStyle = state.get('crachaColetado') ? '#4caf50' : '#2a2035'; ctx.lineWidth = 2; ctx.strokeRect(755, 405, 110, 140); ctx.lineWidth = 1;
+      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('SEGURANÇA', 775, 480);
+
+      // Corredor egípcio
+      ctx.fillStyle = '#0e0c08'; ctx.fillRect(35, 425, 120, 120);
+      ctx.strokeStyle = state.get('laserDesativado') ? '#4caf50' : '#c62828'; ctx.lineWidth = 2; ctx.strokeRect(35, 425, 120, 120); ctx.lineWidth = 1;
+      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('ALA EGÍPCIA', 50, 490);
+
+      // LASERS (se ativos)
+      if (!state.get('laserDesativado')) { renderLasers(ctx); }
+    }
+
+    // === RENDER LASERS ===
+    function renderLasers(ctx) {
+      const alpha = 0.5 + 0.3 * Math.sin(laserPulse);
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 26, 26, ${alpha})`;
+      ctx.shadowColor = 'rgba(255, 26, 26, 0.8)';
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      // Laser A — bloqueia escultura
+      ctx.beginPath(); ctx.moveTo(650, 130); ctx.lineTo(800, 130); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(660, 300); ctx.lineTo(800, 300); ctx.stroke();
+      // Laser B — bloqueia corredor egípcio
+      ctx.beginPath(); ctx.moveTo(20, 420); ctx.lineTo(170, 420); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(20, 550); ctx.lineTo(170, 550); ctx.stroke();
+      // Laser C — decorativo / ambiência
+      ctx.beginPath(); ctx.moveTo(550, 350); ctx.lineTo(550, 500); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(300, 300); ctx.lineTo(550, 300); ctx.stroke();
+      ctx.restore();
+    }
+
+    // === RENDER SEGURANÇA ===
+    function renderSeguranca(ctx) {
+      ctx.fillStyle = '#0e0c14'; ctx.fillRect(0, 0, 900, 600);
+      // Piso
+      ctx.fillStyle = '#0a0812'; ctx.fillRect(0, 520, 900, 80);
+      ctx.strokeStyle = '#1a1525'; ctx.beginPath(); ctx.moveTo(0, 520); ctx.lineTo(900, 520); ctx.stroke();
+
+      // Diagrama de circuito
+      ctx.fillStyle = '#0a0a0f'; ctx.fillRect(55, 55, 240, 190);
+      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 2; ctx.strokeRect(55, 55, 240, 190); ctx.lineWidth = 1;
+      ctx.fillStyle = '#e8b84a'; ctx.font = '11px monospace'; ctx.fillText('DIAGRAMA DE CIRCUITO', 85, 80);
+      // Desenha nodos
+      const nodos = [{x:100,y:120,l:'S1'},{x:200,y:120,l:'S3'},{x:200,y:200,l:'S2'},{x:100,y:200,l:'S4'}];
+      nodos.forEach(n => { ctx.fillStyle='#1a0a0a'; ctx.beginPath(); ctx.arc(n.x,n.y,15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#ff1a1a'; ctx.beginPath(); ctx.arc(n.x,n.y,15,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='#ff1a1a'; ctx.font='10px monospace'; ctx.fillText(n.l,n.x-8,n.y+4); });
+      // Setas de dependência
+      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(115,120); ctx.lineTo(185,120); ctx.stroke(); // S1→S3
+      ctx.beginPath(); ctx.moveTo(200,135); ctx.lineTo(200,185); ctx.stroke(); // S3→S2
+      ctx.beginPath(); ctx.moveTo(185,200); ctx.lineTo(115,200); ctx.stroke(); // S2→S4
+      // Pontas de seta
+      ctx.fillStyle = '#e8b84a';
+      ctx.beginPath(); ctx.moveTo(185,117); ctx.lineTo(180,120); ctx.lineTo(185,123); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(197,185); ctx.lineTo(200,180); ctx.lineTo(203,185); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(115,197); ctx.lineTo(120,200); ctx.lineTo(115,203); ctx.fill();
+
+      // Monitores
+      ctx.fillStyle = '#050510'; ctx.fillRect(405, 55, 190, 140);
+      ctx.strokeStyle = '#2a2035'; ctx.strokeRect(405, 55, 190, 140);
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = '#0a1510'; ctx.fillRect(415+i*45, 65, 40, 55); ctx.strokeStyle = '#1a3a2a'; ctx.strokeRect(415+i*45, 65, 40, 55); }
+      ctx.fillStyle = '#4caf50'; ctx.font = '8px monospace';
+      ctx.fillText('CAM1', 420, 110); ctx.fillText('CAM2', 465, 110); ctx.fillText('CAM3', 510, 110); ctx.fillText('CAM4', 555, 110);
+      ctx.fillStyle = state.get('laserDesativado') ? '#4caf50' : '#ff1a1a'; ctx.font = '10px monospace';
+      ctx.fillText(state.get('laserDesativado') ? 'LASERS: OFF' : 'LASERS: ATIVOS', 440, 180);
+
+      // Painel sensores
+      ctx.fillStyle = '#0a0a12'; ctx.fillRect(355, 325, 190, 130);
+      ctx.strokeStyle = state.get('laserDesativado') ? '#4caf50' : '#ff1a1a'; ctx.lineWidth = 2; ctx.strokeRect(355, 325, 190, 130); ctx.lineWidth = 1;
+      ctx.fillStyle = '#d4cfc0'; ctx.font = '11px monospace'; ctx.fillText('PAINEL SENSORES', 388, 355);
+      // Status dos sensores
+      const sensores = ['sensor1','sensor2','sensor3','sensor4'];
+      sensores.forEach((s, i) => {
+        ctx.fillStyle = state.get(s) ? '#4caf50' : '#ff1a1a';
+        ctx.beginPath(); ctx.arc(385+i*40, 400, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#d4cfc0'; ctx.font = '8px monospace'; ctx.fillText('S'+(i+1), 380+i*40, 425);
+      });
+
+      // Voltar
+      ctx.fillStyle = '#12101a'; ctx.fillRect(35, 525, 125, 45);
+      ctx.strokeStyle = '#2a2035'; ctx.strokeRect(35, 525, 125, 45);
+      ctx.fillStyle = '#7a7060'; ctx.font = '11px Georgia'; ctx.fillText('← Galeria', 60, 552);
+    }
+
+    // === RENDER ALA EGÍPCIA ===
+    function renderEgipcia(ctx) {
+      ctx.fillStyle = '#0c0a06'; ctx.fillRect(0, 0, 900, 600);
+      // Piso areia
+      ctx.fillStyle = '#1a1508'; ctx.fillRect(0, 480, 900, 120);
+      ctx.strokeStyle = '#2a2010'; ctx.beginPath(); ctx.moveTo(0, 480); ctx.lineTo(900, 480); ctx.stroke();
+      // Paredes hieróglifos background
+      ctx.fillStyle = '#0e0c06'; ctx.fillRect(0, 0, 900, 480);
+
+      // Sarcófago
+      ctx.fillStyle = '#1a1505'; ctx.fillRect(90, 110, 130, 230);
+      ctx.strokeStyle = '#e8b84a'; ctx.lineWidth = 2; ctx.strokeRect(90, 110, 130, 230);
+      // Detalhes dourados
+      ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(155, 150, 25, 35, 0, 0, Math.PI*2); ctx.stroke(); // rosto
+      ctx.beginPath(); ctx.moveTo(120, 200); ctx.lineTo(190, 200); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(120, 250); ctx.lineTo(190, 250); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(120, 300); ctx.lineTo(190, 300); ctx.stroke();
+      ctx.fillStyle = '#e8b84a'; ctx.font = '9px Georgia'; ctx.fillText('SARCÓFAGO', 112, 355);
+
+      // Hieróglifos na parede
+      ctx.fillStyle = '#12100a'; ctx.fillRect(355, 85, 190, 170);
+      ctx.strokeStyle = '#3a3020'; ctx.strokeRect(355, 85, 190, 170);
+      // Símbolos
+      ctx.fillStyle = '#c9a84c'; ctx.font = '18px serif';
+      ctx.fillText('𓂀 𓃭 𓅃', 380, 125);
+      ctx.fillText('𓊝 𓋴 𓌳', 380, 160);
+      ctx.fillText('𓏏 𓐍 𓂋', 380, 195);
+      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('HIERÓGLIFOS', 400, 245);
+
+      // Mural de cores
+      ctx.fillStyle = '#12100a'; ctx.fillRect(655, 105, 140, 150);
+      ctx.strokeStyle = '#3a3020'; ctx.strokeRect(655, 105, 140, 150);
+      // Três círculos de cor
+      ctx.fillStyle = '#e8b84a'; ctx.beginPath(); ctx.arc(690, 165, 18, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#1565c0'; ctx.beginPath(); ctx.arc(725, 165, 18, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(760, 165, 18, 0, Math.PI*2); ctx.fill();
+      // Escaravelho abaixo
+      ctx.fillStyle = '#c9a84c'; ctx.font = '22px serif'; ctx.fillText('🪲', 713, 225);
+      ctx.fillStyle = '#7a7060'; ctx.font = '9px Georgia'; ctx.fillText('MURAL RITUAL', 680, 250);
+
+      // Terminal override
+      ctx.fillStyle = '#0a0a12'; ctx.fillRect(355, 385, 190, 110);
+      ctx.strokeStyle = state.get('overrideCompleto') ? '#4caf50' : '#e8b84a'; ctx.lineWidth = 2; ctx.strokeRect(355, 385, 190, 110); ctx.lineWidth = 1;
+      ctx.fillStyle = state.get('overrideCompleto') ? '#4caf50' : '#e8b84a'; ctx.font = '11px monospace';
+      ctx.fillText(state.get('overrideCompleto') ? '✅ DESBLOQUEADO' : '⚡ OVERRIDE', 395, 440);
+      ctx.fillStyle = '#7a7060'; ctx.font = '9px monospace'; ctx.fillText('CODE: ____  CORES: _ _ _', 370, 470);
+
+      // Voltar
+      ctx.fillStyle = '#12100a'; ctx.fillRect(35, 525, 125, 45);
+      ctx.strokeStyle = '#3a3020'; ctx.strokeRect(35, 525, 125, 45);
+      ctx.fillStyle = '#7a7060'; ctx.font = '11px Georgia'; ctx.fillText('← Galeria', 60, 552);
+    }
+
+    game.start(); UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>
