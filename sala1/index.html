@@ -349,9 +349,9 @@
       const amb = state.getAmbiente();
 
       if (amb === 'escritorio') {
-        renderEscritorio(ctx);
+        renderEscritorio(ctx, state);
       } else {
-        renderArquivo(ctx);
+        renderArquivo(ctx, state);
       }
 
       // Objetos interativos (highlight)
