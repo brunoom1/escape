@@ -124,7 +124,7 @@
       { id: 'laptop', x: 310, y: 310, w: 120, h: 75, label: 'Laptop' },
       { id: 'gaveta', x: 445, y: 360, w: 95, h: 50, label: 'Gaveta da mesa' },
       { id: 'estante', x: 140, y: 80, w: 145, h: 345, label: 'Estante' },
-      { id: 'livroVermelho', x: 170, y: 170, w: 26, h: 48, label: 'Livro vermelho' },
+      { id: 'livroVermelho', x: 190, y: 109, w: 22, h: 48, label: 'Livro vermelho' },
       { id: 'luminaria', x: 691, y: 240, w: 70, h: 185, label: 'Luminária' },
       { id: 'lixeira', x: 760, y: 480, w: 55, h: 65, label: 'Lixeira' },
       { id: 'cofre', x: 620, y: 80, w: 110, h: 100, label: 'Cofre' },
@@ -205,7 +205,7 @@
       } else if (id === 'lixeira') {
         if (!state.get('lixeira')) {
           state.set('lixeira', true);
-          inv.add('rabisco', '🗑️', 'Nota: "3 dígitos não bastam. Preencha com zeros à esquerda."');
+          inv.add('rabisco', '🗑️', 'Nota: "O sistema rejeitou. Preciso completar o formato."');
           msg('Papéis amassados. Um deles, escrito às pressas: "O sistema rejeitou! Três dígitos não bastam. Preciso preencher até completar o formato." Riscado com frustração.');
         } else {
           msg('Nota amassada: "Três dígitos não bastam. Preencher até completar o formato."');

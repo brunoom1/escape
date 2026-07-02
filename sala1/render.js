@@ -181,23 +181,60 @@ function renderEsc_Objetos(ctx, state) {
   }
   // Livros variados
   const bookColors = ['#4a1a1a', '#1a3a1a', '#1a1a4a', '#4a3a1a', '#3a1a3a', '#2a3a2a'];
+  const bookHeights = [48, 42, 53, 45, 50, 47, 44, 51, 46, 49, 43, 52, 48, 41, 55, 44, 50, 46, 53, 42, 47, 51, 45, 49];
   for (let row = 0; row < 4; row++) {
     for (let i = 0; i < 6; i++) {
-      const bh = 40 + Math.random() * 15;
+      const bh = bookHeights[row * 6 + i];
       ctx.fillStyle = bookColors[(row + i) % 6];
       ctx.fillRect(148 + i * 22, 100 + row * 70 + (55 - bh), 18, bh);
     }
   }
-  // Livro vermelho destaque (brilha se gaveta aberta)
-  ctx.fillStyle = state.get('passagemAberta') ? '#4d0000' : '#cc2200';
-  ctx.fillRect(170, 170, 26, 48);
+  // Livro vermelho destaque — se integra na prateleira mas se destaca sutilmente
+  const livroX = 192;
+  const livroY = 100 + (55 - 46);
+  const livroW = 18;
+  const livroH = 46;
+  // Sombra atrás (profundidade)
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(livroX + 2, livroY + 2, livroW, livroH);
+  // Corpo principal — vermelho escuro, tom coerente com a paleta noir
+  const livroGrad = ctx.createLinearGradient(livroX, livroY, livroX + livroW, livroY);
+  livroGrad.addColorStop(0, state.get('passagemAberta') ? '#2a0a0a' : '#7a1515');
+  livroGrad.addColorStop(0.3, state.get('passagemAberta') ? '#1a0505' : '#9b2020');
+  livroGrad.addColorStop(1, state.get('passagemAberta') ? '#2a0a0a' : '#6b1010');
+  ctx.fillStyle = livroGrad;
+  ctx.fillRect(livroX, livroY, livroW, livroH);
+  // Lombada (borda esquerda mais escura)
+  ctx.fillStyle = state.get('passagemAberta') ? '#150505' : '#4a0c0c';
+  ctx.fillRect(livroX, livroY, 3, livroH);
+  // Linhas horizontais decorativas (douradas, sutis)
+  if (!state.get('passagemAberta')) {
+    ctx.fillStyle = '#8b7340';
+    ctx.fillRect(livroX + 5, livroY + 8, 12, 1);
+    ctx.fillRect(livroX + 5, livroY + 37, 12, 1);
+    // Pequeno losango central
+    ctx.fillStyle = '#a8863a';
+    ctx.beginPath();
+    ctx.moveTo(livroX + 10, livroY + 19);
+    ctx.lineTo(livroX + 13, livroY + 23);
+    ctx.lineTo(livroX + 10, livroY + 27);
+    ctx.lineTo(livroX + 7, livroY + 23);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Borda sutil
+  ctx.strokeStyle = state.get('passagemAberta') ? '#3a1010' : '#5a1010';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(livroX, livroY, livroW, livroH);
+  // Glow dourado — aparece APENAS quando o jogador tem a pista da gaveta
   if (!state.get('passagemAberta') && state.get('gavetaAberta')) {
+    ctx.save();
     ctx.shadowColor = '#c9a84c';
-    ctx.shadowBlur = 12;
-    ctx.strokeStyle = '#c9a84c';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(170, 170, 26, 48);
-    ctx.shadowBlur = 0;
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = 'rgba(201, 168, 76, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(livroX - 2, livroY - 2, livroW + 4, livroH + 4);
+    ctx.restore();
   }
 
   // --- QUADRO DE INVESTIGAÇÃO ---
