@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 12 — O Teatro Fantasma</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Georgia', serif; background: #0c0608; color: #e8d0c4; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #5a1f28; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/api.js"></script>
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/theater.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
+
+  <script>
+    UITokens.apply(ThemeTheater);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0c0608' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'palco', flags: {
+      spot: false, partitura: false, poltrona: false, chaveCamarim: false, cortina: false,
+      espelho: false, gaveta: false, cartaz: false, mascaraColetada: false,
+      caixaMusica: false, vitoria: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+
+    UITabs.create('tabs', [
+      { id: 'palco', label: 'Palco', locked: false },
+      { id: 'camarim', label: 'Camarim', locked: true },
+      { id: 'sotao', label: 'Sótão dos Órgãos', locked: true }
+    ], (tabId) => {
+      if (tabId === 'camarim' && !state.get('chaveCamarim')) {
+        msg('A porta do camarim está trancada por uma estrela dourada. Preciso da chave.');
+        UITabs.setActive('tabs', state.getAmbiente()); return;
+      }
+      if (tabId === 'sotao' && !state.get('mascaraColetada')) {
+        msg('A escada para o sótão só se abre para quem porta a máscara do Fantasma.');
+        UITabs.setActive('tabs', state.getAmbiente()); return;
+      }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmb(tabId); });
+    });
+
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
+    const motes = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(232,193,90,0.12)', count: 16, speedX: [-0.3,0.3], speedY: [0.1,0.6], size: [0.8,1.6], life: [6,12] });
+
+    function msg(t) { UIMessageBox.show('message', t); }
+    function msgAmb(a) {
+      if (a === 'palco') msg('O palco do velho teatro. Cortinas de veludo apodrecidas, a plateia vazia mergulhada em sombras.');
+      else if (a === 'camarim') msg('O camarim da diva. Um espelho cercado de lâmpadas, figurinos empoeirados, o perfume de outra época.');
+      else msg('O sótão dos órgãos, sob o telhado. Tubos de latão sobem até as vigas. O Grande Órgão aguarda, silencioso, há 50 anos.');
+    }
+    msg('Meia-noite no teatro condenado. Uma voz cantou nos corredores vazios e as portas se fecharam. Dizem que o Fantasma só liberta quem tocar sua ária.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
+    timer.start();
+
+    // ============ OBJETOS (posições = render.js) ============
+    const objetosPalco = [
+      { id: 'partitura', x: 360, y: 380, w: 130, h: 70, label: 'Partitura no chão' },
+      { id: 'poltrona', x: 150, y: 486, w: 90, h: 84, label: 'Poltrona 13' },
+      { id: 'holofote', x: 700, y: 470, w: 80, h: 90, label: 'Interruptor das luzes' },
+      { id: 'cortina', x: 600, y: 110, w: 120, h: 120, label: 'Mecanismo da cortina' },
+      { id: 'portaCamarim', x: 810, y: 130, w: 70, h: 310, label: 'Porta → Camarim' },
+    ];
+    const objetosCamarim = [
+      { id: 'espelho', x: 100, y: 90, w: 260, h: 280, label: 'Espelho de camarim' },
+      { id: 'gaveta', x: 140, y: 400, w: 80, h: 36, label: 'Gaveta da penteadeira' },
+      { id: 'cartaz', x: 480, y: 90, w: 150, h: 220, label: 'Cartaz da ópera' },
+      { id: 'bau', x: 680, y: 360, w: 150, h: 90, label: 'Baú de figurinos' },
+      { id: 'escadaSotao', x: 700, y: 110, w: 120, h: 220, label: 'Escada → Sótão' },
+      { id: 'portaPalco', x: 30, y: 130, w: 60, h: 300, label: 'Porta → Palco' },
+    ];
+    const objetosSotao = [
+      { id: 'rosacea', x: 390, y: 60, w: 120, h: 120, label: 'Rosácea' },
+      { id: 'orgao', x: 280, y: 200, w: 340, h: 240, label: 'Grande Órgão' },
+      { id: 'caixaMusica', x: 80, y: 360, w: 130, h: 90, label: 'Caixa de música' },
+      { id: 'saida', x: 700, y: 360, w: 130, h: 90, label: 'Saída pelo telhado' },
+      { id: 'escadaDesce', x: 30, y: 470, w: 100, h: 60, label: '↓ Camarim' },
+    ];
+    function getObjetos() {
+      const a = state.getAmbiente();
+      if (a === 'palco') return objetosPalco;
+      if (a === 'camarim') return objetosCamarim;
+      return objetosSotao;
+    }
+
+    // ============ INTERAÇÕES ============
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+
+      // -- PALCO --
+      if (id === 'holofote') {
+        if (!state.get('spot')) {
+          state.set('spot', true);
+          msg('Você aciona o interruptor. Um holofote estala e ilumina o centro do palco, revelando papéis espalhados pelo assoalho.');
+        } else { msg('O holofote banha o palco em luz dourada.'); }
+      } else if (id === 'partitura') {
+        if (!state.get('spot')) {
+          msg('Há papéis no chão do palco, mas está escuro demais para distinguir o que são. Preciso de luz.');
+        } else if (!state.get('partitura')) {
+          state.set('partitura', true);
+          inv.add('partitura', '🎼', 'Partitura: a ária sobe e desce como um arco');
+          msg('Uma partitura manuscrita da ária final. Anotação à margem: "A melodia é um arco perfeito: começa e termina na nota mais grave (Dó); o ápice, bem no centro, é a mais aguda (Sol)."');
+        } else { msg('Partitura: arco — extremos em Dó (grave), ápice central em Sol (aguda).'); }
+      } else if (id === 'poltrona') {
+        if (!state.get('poltrona')) {
+          state.set('poltrona', true);
+          state.set('chaveCamarim', true);
+          inv.add('chaveCamarim', '🗝️', 'Chave do camarim');
+          UITabs.unlock('tabs', 'camarim');
+          msg('Na poltrona 13 — a favorita do Fantasma — alguém deixou uma chave presa entre o estofado e o assento. A chave do camarim!');
+        } else { msg('Nada mais na poltrona 13.'); }
+      } else if (id === 'cortina') {
+        if (!state.get('cortina')) {
+          state.set('cortina', true);
+          msg('Você aciona o mecanismo. A cortina central se abre com um rangido, revelando o vazio da coxia. Uma corrente fria sopra do fundo.');
+        } else { msg('A cortina central está aberta.'); }
+      } else if (id === 'portaCamarim') {
+        if (state.get('chaveCamarim')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('camarim'); UITabs.setActive('tabs', 'camarim'); msgAmb('camarim'); });
+        } else { msg('A porta do camarim, com uma estrela dourada, está trancada.'); }
+      }
+
+      // -- CAMARIM --
+      else if (id === 'espelho') {
+        if (!state.get('espelho')) {
+          state.set('espelho', true);
+          msg('Você toca o espelho e as lâmpadas se acendem sozinhas. Escrito no vidro embaçado: "Toque minha ária e serás livre. — O.G." As iniciais do Fantasma da Ópera.');
+        } else { msg('No espelho: "Toque minha ária e serás livre. — O.G."'); }
+      } else if (id === 'gaveta') {
+        if (!state.get('gaveta')) {
+          state.set('gaveta', true);
+          msg('A gaveta da penteadeira range. Dentro, só um frasco de perfume seco e um programa antigo. Nada essencial — mas o clima arrepia.');
+        } else { msg('A gaveta está vazia.'); }
+      } else if (id === 'cartaz') {
+        if (!state.get('cartaz')) {
+          state.set('cartaz', true);
+          inv.add('cartaz', '📜', 'Cartaz: "A Ópera do Fantasma — em 5 atos"');
+          msg('O cartaz original: "A ÓPERA DO FANTASMA — em 5 atos". Cinco atos... cinco notas na ária final, talvez?');
+        } else { msg('Cartaz: a ópera tem 5 atos.'); }
+      } else if (id === 'bau') {
+        if (!state.get('mascaraColetada')) {
+          state.set('mascaraColetada', true);
+          inv.add('mascara', '🎭', 'Máscara branca do Fantasma');
+          UITabs.unlock('tabs', 'sotao');
+          msg('No fundo do baú de figurinos, sob capas de veludo: a máscara branca do Fantasma. Ao segurá-la, a escada do sótão destranca sozinha.');
+        } else { msg('O baú está vazio; a máscara já é sua.'); }
+      } else if (id === 'escadaSotao') {
+        if (state.get('mascaraColetada')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('sotao'); UITabs.setActive('tabs', 'sotao'); msgAmb('sotao'); });
+        } else { msg('A escada do sótão não se abre. Falta algo que pertença ao Fantasma.'); }
+      } else if (id === 'portaPalco') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('palco'); UITabs.setActive('tabs', 'palco'); msg('De volta ao palco.'); });
+      }
+
+      // -- SÓTÃO --
+      else if (id === 'caixaMusica') {
+        if (!state.get('caixaMusica')) {
+          state.set('caixaMusica', true);
+          inv.add('caixa', '🎵', 'Caixa de música: os degraus intermediários são Mi');
+          msg('Você gira a manivela da caixa de música. Uma melodia frágil toca. Entre a nota mais grave e o ápice, os degraus intermediários repetem sempre a mesma nota: Mi.');
+        } else { msg('Caixa de música: os degraus intermediários são Mi.'); }
+      } else if (id === 'orgao') {
+        abrirOrgao();
+      } else if (id === 'rosacea') {
+        msg('A rosácea deixa entrar o luar. Lá embaixo, a cidade adormecida. Se você tocar a ária, talvez alcance o telhado por aqui.');
+      } else if (id === 'saida') {
+        if (state.get('vitoria')) {
+          escapar();
+        } else {
+          msg('A passagem para o telhado só se abre ao som da ária do Fantasma. O Grande Órgão precisa ser tocado corretamente.');
+        }
+      } else if (id === 'escadaDesce') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('camarim'); UITabs.setActive('tabs', 'camarim'); msg('De volta ao camarim.'); });
+      }
+
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // ============ PUZZLE FINAL: ÓRGÃO (Dó Mi Sol Mi Dó) ============
+    let seqNotas = [];
+    const NOTAS_CERTAS = ['Dó', 'Mi', 'Sol', 'Mi', 'Dó'];
+    function abrirOrgao() {
+      if (state.get('vitoria')) { msg('A ária já ecoou. A passagem está aberta.'); return; }
+      seqNotas = [];
+      const notas = ['Dó', 'Ré', 'Mi', 'Fá', 'Sol'];
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:10px;">🎹 Grande Órgão — Toque a ária (5 notas)</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.85rem; margin-bottom:12px;">Reproduza a ária final do Fantasma.</p>
+        <div id="notaDisplay" style="font-size:1.3rem; color:${UITokens.get('colorAccent')}; min-height:28px; margin-bottom:12px;">—</div>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          ${notas.map(n => `<button class="nota" data-n="${n}" style="padding:14px 16px; background:#14080c; border:1px solid #5a1f28; color:#e8d0c4; font-family:'Georgia',serif; font-size:1rem; cursor:pointer; border-radius:4px;">${n}</button>`).join('')}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:16px;">
+          <button id="btnNotaReset" style="padding:8px 18px; background:#1c0c10; border:1px solid #d43a4a; color:#d43a4a; font-family:'Georgia',serif; cursor:pointer; border-radius:4px;">Recomeçar</button>
+          <button id="btnNotaVoltar" style="padding:8px 18px; background:#1c0c10; border:1px solid #5a1f28; color:#e8d0c4; font-family:'Georgia',serif; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.querySelectorAll('.nota').forEach(b => b.addEventListener('click', () => {
+          if (seqNotas.length >= 5) return;
+          seqNotas.push(b.dataset.n);
+          document.getElementById('notaDisplay').textContent = seqNotas.join(' · ');
+          if (seqNotas.length === 5) verificarNotas();
+        }));
+        document.getElementById('btnNotaReset').addEventListener('click', () => { seqNotas = []; document.getElementById('notaDisplay').textContent = '—'; });
+        document.getElementById('btnNotaVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do órgão.'); });
+      }, 50);
+      msg('O Grande Órgão. As teclas aguardam a ária final — cinco notas, como os cinco atos da ópera.');
+    }
+    function verificarNotas() {
+      if (JSON.stringify(seqNotas) === JSON.stringify(NOTAS_CERTAS)) {
+        state.set('vitoria', true);
+        UIPanel.hide('puzzle-panel');
+        msg('✅ As notas ressoam pelos tubos e o teatro inteiro treme. Uma passagem se abre no telhado, banhada de luar. A ária libertou você.');
+      } else {
+        msg('❌ As notas soam dissonantes. O órgão silencia. Lembre-se: um arco — Dó nas pontas, Sol no ápice, e os degraus no meio.');
+        seqNotas = [];
+        const d = document.getElementById('notaDisplay');
+        if (d) d.textContent = '—';
+      }
+    }
+
+    // ============ ESCAPE ============
+    function escapar() {
+      timer.stop();
+      const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+      if (EscapeAPI.isLoggedIn()) {
+        EscapeAPI.registrarResultado('Sala 12 — O Teatro Fantasma', 'win', tempoSeg);
+      }
+      UISuccessOverlay.show('success-overlay', {
+        title: '🎭 A ÁRIA LIBERTOU VOCÊ',
+        subtitle: 'Você emerge no telhado sob o luar. Lá embaixo, o teatro se aquieta — e, pela última vez, uma voz sussurra "obrigado" nas sombras.',
+        time: timer.format(),
+        links: [{ text: '← Voltar ao Lobby', href: '../index.html' }]
+      });
+    }
+
+    // ============ INPUT ============
+    input.onClick((x, y) => {
+      if (EscapeTransitions.isTransitioning()) return;
+      const obj = input.hitTest(x, y, getObjetos());
+      if (obj) interagir(obj);
+    });
+
+    // ============ RENDER ============
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'palco') renderPalco(ctx, state);
+      else if (amb === 'camarim') renderCamarim(ctx, state);
+      else renderSotao(ctx, state);
+
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) {
+        if (hovered && hovered.id === obj.id) {
+          ctx.save();
+          ctx.strokeStyle = UITokens.get('glowColor');
+          ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor');
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+          ctx.restore();
+        }
+      }
+      motes.update(dt); motes.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>

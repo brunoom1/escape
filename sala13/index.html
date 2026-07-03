@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 13 — A Mina Abandonada</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; background: #0a0806; color: #dcc8a8; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #4a3420; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/api.js"></script>
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/mine.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
+
+  <script>
+    UITokens.apply(ThemeMine);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a0806' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'entrada', flags: {
+      ferramentas: false, lampiaoAceso: false, quadro: false, vagonete: false,
+      veio: false, placa: false, escora: false,
+      gerador: false, vitoria: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+
+    UITabs.create('tabs', [
+      { id: 'entrada', label: 'Entrada da Mina', locked: false },
+      { id: 'galeria', label: 'Galeria Profunda', locked: true },
+      { id: 'elevador', label: 'Sala do Elevador', locked: true }
+    ], (tabId) => {
+      if ((tabId === 'galeria' || tabId === 'elevador') && !state.get('lampiaoAceso')) {
+        msg('A escuridão da mina é total. Sem uma luz, é suicídio avançar.');
+        UITabs.setActive('tabs', state.getAmbiente()); return;
+      }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmb(tabId); });
+    });
+
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
+    const poeira = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(224,144,42,0.10)', count: 18, speedX: [-0.4,0.4], speedY: [0.1,0.7], size: [0.8,1.8], life: [6,12] });
+
+    function msg(t) { UIMessageBox.show('message', t); }
+    function msgAmb(a) {
+      if (a === 'entrada') msg('A boca da velha mina de ouro. Trilhos enferrujados descem para a escuridão. Um desmoronamento selou a saída principal atrás de você.');
+      else if (a === 'galeria') msg('A galeria profunda. Escoras de madeira gemem sob o peso da montanha. Um veio de ouro brilha na parede — o tesouro que condenou tantos.');
+      else msg('A sala do velho elevador de carga. É a única forma de subir à superfície — se houver energia e o código certo.');
+    }
+    msg('Você desceu à mina para investigar e um desmoronamento bloqueou a saída. O único caminho para cima é o antigo elevador de carga, lá no fundo.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
+    timer.start();
+
+    // ============ OBJETOS (posições = render.js) ============
+    const objetosEntrada = [
+      { id: 'quadro', x: 60, y: 90, w: 160, h: 150, label: 'Quadro de avisos' },
+      { id: 'lampiao', x: 300, y: 165, w: 60, h: 105, label: 'Lampião de carbureto' },
+      { id: 'ferramentas', x: 470, y: 380, w: 130, h: 70, label: 'Caixa de ferramentas' },
+      { id: 'vagonete', x: 650, y: 380, w: 130, h: 90, label: 'Vagonete' },
+      { id: 'tunelGaleria', x: 810, y: 150, w: 70, h: 300, label: 'Túnel → Galeria' },
+    ];
+    const objetosGaleria = [
+      { id: 'veio', x: 100, y: 180, w: 130, h: 120, label: 'Veio de ouro' },
+      { id: 'placa', x: 400, y: 160, w: 140, h: 90, label: 'Placa de profundidade' },
+      { id: 'escora', x: 636, y: 250, w: 34, h: 60, label: 'Escora rachada' },
+      { id: 'tunelElevador', x: 30, y: 150, w: 70, h: 300, label: 'Túnel → Elevador' },
+      { id: 'tunelEntrada', x: 800, y: 250, w: 90, h: 100, label: 'Túnel → Entrada' },
+    ];
+    const objetosElevador = [
+      { id: 'gerador', x: 60, y: 300, w: 150, h: 140, label: 'Gerador' },
+      { id: 'painel', x: 650, y: 250, w: 180, h: 160, label: 'Painel de controle' },
+      { id: 'cabine', x: 350, y: 90, w: 200, h: 350, label: 'Cabine do elevador' },
+      { id: 'tunelGaleria', x: 30, y: 470, w: 100, h: 60, label: '→ Galeria' },
+    ];
+    function getObjetos() {
+      const a = state.getAmbiente();
+      if (a === 'entrada') return objetosEntrada;
+      if (a === 'galeria') return objetosGaleria;
+      return objetosElevador;
+    }
+
+    // ============ INTERAÇÕES ============
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+
+      // -- ENTRADA --
+      if (id === 'ferramentas') {
+        if (!state.get('ferramentas')) {
+          state.set('ferramentas', true);
+          inv.add('carbureto', '⛏️', 'Carbureto e isqueiro (combustível de lampião)');
+          msg('Na caixa de ferramentas: um punhado de pedras de carbureto e um velho isqueiro. É o combustível de um lampião de mineiro.');
+        } else { msg('A caixa só tinha o carbureto e o isqueiro.'); }
+      } else if (id === 'lampiao') {
+        if (state.get('lampiaoAceso')) {
+          msg('O lampião de carbureto arde com chama estável, pronto para iluminar as galerias.');
+        } else if (state.get('ferramentas')) {
+          state.set('lampiaoAceso', true);
+          UITabs.unlock('tabs', 'galeria');
+          UITabs.unlock('tabs', 'elevador');
+          msg('Você abastece o lampião com carbureto e o acende. Uma chama âmbar ilumina a mina — agora dá para descer com segurança.');
+        } else {
+          msg('O lampião de carbureto está apagado e vazio. Preciso de combustível para acendê-lo.');
+        }
+      } else if (id === 'quadro') {
+        if (!state.get('quadro')) {
+          state.set('quadro', true);
+          inv.add('aviso', '📋', 'Aviso: elevador exige o código de profundidade');
+          msg('O quadro de avisos da administração: "SEGURANÇA — o elevador de carga só retorna à superfície com o CÓDIGO DE PROFUNDIDADE do nível principal, em metros. Registro oficial: as CENTENAS são 4."');
+        } else { msg('Aviso: código = profundidade do nível principal (m). Centenas = 4.'); }
+      } else if (id === 'vagonete') {
+        if (!state.get('vagonete')) {
+          state.set('vagonete', true);
+          msg('O vagonete carrega minério bruto. Nada de valor imediato — mas pesado o bastante para servir de contrapeso, quem sabe.');
+        } else { msg('Só minério bruto no vagonete.'); }
+      } else if (id === 'tunelGaleria' && state.getAmbiente() === 'entrada') {
+        if (state.get('lampiaoAceso')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('galeria'); UITabs.setActive('tabs', 'galeria'); msgAmb('galeria'); });
+        } else { msg('Escuridão total lá dentro. Preciso acender o lampião.'); }
+      }
+
+      // -- GALERIA --
+      else if (id === 'placa') {
+        if (!state.get('placa')) {
+          state.set('placa', true);
+          inv.add('placa', '🪧', 'Placa: profundidade "_ 2 0 m"');
+          msg('Uma placa de metal fixada na rocha: "NÍVEL PRINCIPAL — PROFUNDIDADE: _ 2 0 m". O primeiro dígito está corroído demais para ler.');
+        } else { msg('Placa: profundidade "_ 2 0 m" (o primeiro dígito se apagou).'); }
+      } else if (id === 'veio') {
+        if (!state.get('veio')) {
+          state.set('veio', true);
+          msg('O veio de ouro reluz sob o lampião. Lindo e traiçoeiro — foi por isso que abriram esta mina condenada. Não dá para carregá-lo.');
+        } else { msg('O veio de ouro brilha, intocável.'); }
+      } else if (id === 'escora') {
+        if (!state.get('escora')) {
+          state.set('escora', true);
+          msg('Uma escora de madeira rachada, prestes a ceder. Melhor não encostar. A montanha inteira range sobre sua cabeça.');
+        } else { msg('A escora rachada geme perigosamente.'); }
+      } else if (id === 'tunelElevador') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('elevador'); UITabs.setActive('tabs', 'elevador'); msgAmb('elevador'); });
+      } else if (id === 'tunelEntrada') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('entrada'); UITabs.setActive('tabs', 'entrada'); msg('De volta à entrada da mina.'); });
+      }
+
+      // -- ELEVADOR --
+      else if (id === 'gerador') {
+        if (!state.get('gerador')) {
+          state.set('gerador', true);
+          msg('Você puxa a alavanca do gerador a diesel. Depois de tossir fumaça, ele ronca e ganha vida. O painel do elevador se acende!');
+        } else { msg('O gerador ronca firme, alimentando o elevador.'); }
+      } else if (id === 'painel') {
+        abrirPainel();
+      } else if (id === 'cabine') {
+        msg('A cabine de carga do elevador. Robusta, enferrujada, mas de pé. Ela sobe assim que o painel receber o código correto.');
+      } else if (id === 'tunelGaleria' && state.getAmbiente() === 'elevador') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('galeria'); UITabs.setActive('tabs', 'galeria'); msg('De volta à galeria profunda.'); });
+      }
+
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // ============ PUZZLE FINAL: PAINEL DO ELEVADOR (código 420) ============
+    function abrirPainel() {
+      if (state.get('vitoria')) { msg('O elevador já está subindo!'); return; }
+      if (!state.get('gerador')) {
+        msg('O painel está morto. Preciso ligar o gerador primeiro.');
+        return;
+      }
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🛗 Painel do Elevador — Código de profundidade (3 dígitos)</p>
+        <input type="text" id="elevInput" maxlength="3" placeholder="_ _ _"
+          style="background:#0a0805; border:1px solid #4a3420; color:#e0902a; font-family:'Courier New'; font-size:1.5rem; padding:10px; width:120px; text-align:center; border-radius:4px;">
+        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+          <button id="btnElev" style="padding:8px 22px; background:#1a1410; border:1px solid #e0902a; color:#e0902a; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Subir</button>
+          <button id="btnElevVoltar" style="padding:8px 20px; background:#1a1410; border:1px solid #4a3420; color:#dcc8a8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('elevInput').focus();
+        document.getElementById('btnElev').addEventListener('click', tentarElev);
+        document.getElementById('btnElevVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do painel.'); });
+        document.getElementById('elevInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tentarElev(); });
+      }, 50);
+      msg('O painel de controle do elevador pede o código de profundidade de 3 dígitos.');
+    }
+    function tentarElev() {
+      const el = document.getElementById('elevInput');
+      if (!el) return;
+      if (el.value.trim() === '420') {
+        state.set('vitoria', true);
+        UIPanel.hide('puzzle-panel');
+        escapar();
+      } else {
+        msg('❌ Código incorreto. O elevador não se move. Cruze o registro do quadro com a placa de profundidade.');
+        el.value = ''; el.focus();
+      }
+    }
+
+    // ============ ESCAPE ============
+    function escapar() {
+      timer.stop();
+      const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+      if (EscapeAPI.isLoggedIn()) {
+        EscapeAPI.registrarResultado('Sala 13 — A Mina Abandonada', 'win', tempoSeg);
+      }
+      UISuccessOverlay.show('success-overlay', {
+        title: '⛏️ DE VOLTA À SUPERFÍCIE!',
+        subtitle: 'A cabine range e sobe pelo poço escuro. Quando as portas se abrem, o sol quase esquecido queima seus olhos. Você deixou a mina — e o ouro — para trás.',
+        time: timer.format(),
+        links: [{ text: '← Voltar ao Lobby', href: '../index.html' }]
+      });
+    }
+
+    // ============ INPUT ============
+    input.onClick((x, y) => {
+      if (EscapeTransitions.isTransitioning()) return;
+      const obj = input.hitTest(x, y, getObjetos());
+      if (obj) interagir(obj);
+    });
+
+    // ============ RENDER ============
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'entrada') renderEntrada(ctx, state);
+      else if (amb === 'galeria') renderGaleria(ctx, state);
+      else renderElevador(ctx, state);
+
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) {
+        if (hovered && hovered.id === obj.id) {
+          ctx.save();
+          ctx.strokeStyle = UITokens.get('glowColor');
+          ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor');
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+          ctx.restore();
+        }
+      }
+      poeira.update(dt); poeira.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>

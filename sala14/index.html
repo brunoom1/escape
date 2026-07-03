@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 14 — O Observatório</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; background: #05060f; color: #c8d0ec; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #26305a; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/api.js"></script>
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/observatory.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
+
+  <script>
+    UITokens.apply(ThemeObservatory);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#05060f' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'controle', flags: {
+      gaveta: false, energia: false, chaveArquivo: false, monitor: false,
+      mapa: false, globo: false, mesa: false, cofre: false, filtros: false,
+      vitoria: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+
+    UITabs.create('tabs', [
+      { id: 'controle', label: 'Sala de Controle', locked: false },
+      { id: 'cupula', label: 'Cúpula do Telescópio', locked: true },
+      { id: 'arquivo', label: 'Arquivo Estelar', locked: true }
+    ], (tabId) => {
+      if (tabId === 'cupula' && !state.get('energia')) {
+        msg('A porta blindada da cúpula está sem energia. Preciso religar o sistema primeiro.');
+        UITabs.setActive('tabs', state.getAmbiente()); return;
+      }
+      if (tabId === 'arquivo' && !state.get('chaveArquivo')) {
+        msg('A porta do arquivo estelar está trancada. Preciso de uma chave.');
+        UITabs.setActive('tabs', state.getAmbiente()); return;
+      }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmb(tabId); });
+    });
+
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
+    const estrelas = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 300, color: 'rgba(138,180,255,0.25)', count: 30, speedX: [-0.2,0.2], speedY: [-0.15,0.15], size: [0.4,1.3], life: [8,18] });
+
+    function msg(t) { UIMessageBox.show('message', t); }
+    function msgAmb(a) {
+      if (a === 'controle') msg('A sala de controle do observatório. Monitores mortos, consoles cobertos de poeira. Um alarme silencioso pisca: o telescópio perdeu o alvo.');
+      else if (a === 'cupula') msg('A cúpula do grande telescópio. A fenda se abre para um céu de inverno cravejado de estrelas. O instrumento aguarda coordenadas.');
+      else msg('O arquivo estelar. Prateleiras de mapas do céu, um globo celeste giratório e cartas de navegação astronômica.');
+    }
+    msg('Você é o astrônomo de plantão. Um sinal misterioso veio do espaço e sumiu — e as portas do observatório se selaram. Realinhe o telescópio ao alvo certo para reabrir o sistema e sair.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
+    timer.start();
+
+    // ============ OBJETOS (posições = render.js) ============
+    const objetosControle = [
+      { id: 'painelEnergia', x: 60, y: 90, w: 150, h: 160, label: 'Painel de energia' },
+      { id: 'monitor', x: 330, y: 70, w: 240, h: 170, label: 'Monitor principal' },
+      { id: 'gaveta', x: 330, y: 360, w: 160, h: 70, label: 'Gaveta de instrumentos' },
+      { id: 'portaCupula', x: 810, y: 120, w: 70, h: 320, label: 'Porta → Cúpula' },
+      { id: 'portaArquivo', x: 620, y: 300, w: 130, h: 140, label: 'Porta → Arquivo' },
+    ];
+    const objetosArquivo = [
+      { id: 'mapa', x: 40, y: 60, w: 250, h: 300, label: 'Mapas estelares' },
+      { id: 'globo', x: 368, y: 203, w: 164, h: 164, label: 'Globo celeste' },
+      { id: 'mesa', x: 600, y: 360, w: 200, h: 80, label: 'Mesa de cartas' },
+      { id: 'cofre', x: 640, y: 90, w: 150, h: 140, label: 'Cofre de dados' },
+      { id: 'portaControle', x: 30, y: 130, w: 60, h: 300, label: 'Porta → Controle' },
+    ];
+    const objetosCupula = [
+      { id: 'telescopio', x: 350, y: 250, w: 240, h: 200, label: 'Telescópio' },
+      { id: 'console', x: 640, y: 340, w: 200, h: 120, label: 'Console de alinhamento' },
+      { id: 'filtros', x: 70, y: 320, w: 150, h: 140, label: 'Roda de filtros' },
+      { id: 'escadaControle', x: 30, y: 480, w: 100, h: 60, label: '↓ Controle' },
+    ];
+    function getObjetos() {
+      const a = state.getAmbiente();
+      if (a === 'controle') return objetosControle;
+      if (a === 'arquivo') return objetosArquivo;
+      return objetosCupula;
+    }
+
+    // ============ INTERAÇÕES ============
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+
+      // -- CONTROLE --
+      if (id === 'gaveta') {
+        if (!state.get('gaveta')) {
+          state.set('gaveta', true);
+          state.set('chaveArquivo', true);
+          inv.add('fusivel', '🔌', 'Fusível de reserva');
+          inv.add('chaveArquivo', '🗝️', 'Chave do arquivo estelar');
+          UITabs.unlock('tabs', 'arquivo');
+          msg('Na gaveta de instrumentos: um fusível de reserva e a chave do arquivo estelar. O arquivo agora pode ser aberto.');
+        } else { msg('A gaveta está vazia; fusível e chave já foram retirados.'); }
+      } else if (id === 'painelEnergia') {
+        if (state.get('energia')) {
+          msg('O painel de energia está online. Todo o observatório zumbe de volta à vida.');
+        } else if (inv.has('fusivel')) {
+          state.set('energia', true);
+          UITabs.unlock('tabs', 'cupula');
+          msg('Você encaixa o fusível no slot vazio e aciona a chave geral. Luzes azuis se acendem — energia restaurada! A cúpula está acessível.');
+        } else {
+          msg('O painel de energia tem um slot de fusível vazio. Sem o fusível, nada liga.');
+        }
+      } else if (id === 'monitor') {
+        if (!state.get('energia')) {
+          msg('O monitor está morto. Sem energia, não mostra nada.');
+        } else if (!state.get('monitor')) {
+          state.set('monitor', true);
+          inv.add('mensagem', '🖥️', 'Sistema: "Busque o Caçador no céu de inverno"');
+          msg('O monitor desperta. Última mensagem do sistema: "ALVO PERDIDO. Para reabrir, reaponte o telescópio à constelação que os antigos chamavam de O CAÇADOR, soberana do céu de inverno."');
+        } else {
+          msg('Monitor: "Reaponte à constelação do Caçador, soberana do céu de inverno."');
+        }
+      } else if (id === 'portaCupula') {
+        if (state.get('energia')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('cupula'); UITabs.setActive('tabs', 'cupula'); msgAmb('cupula'); });
+        } else { msg('A porta da cúpula está sem energia.'); }
+      } else if (id === 'portaArquivo') {
+        if (state.get('chaveArquivo')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('arquivo'); UITabs.setActive('tabs', 'arquivo'); msgAmb('arquivo'); });
+        } else { msg('A porta do arquivo está trancada.'); }
+      }
+
+      // -- ARQUIVO --
+      else if (id === 'mapa') {
+        if (!state.get('mapa')) {
+          state.set('mapa', true);
+          inv.add('mapa', '🗺️', 'Mapa: coordenada de Órion "5 _ 5"');
+          msg('Você desenrola o mapa da constelação de Órion, o Caçador. A ficha técnica: "Coordenada de ascensão reta = 5 _ 5". O dígito do meio foi apagado pelo tempo.');
+        } else { msg('Mapa de Órion: coordenada "5 _ 5" (dígito central apagado).'); }
+      } else if (id === 'globo') {
+        if (!state.get('globo')) {
+          state.set('globo', true);
+          inv.add('globo', '🌐', 'Globo: dígito central da coordenada de Órion = 8');
+          msg('O globo celeste gira sob seus dedos até Órion. Gravado na base, o dado que falta: "dígito central da coordenada = 8".');
+        } else { msg('Globo: o dígito central da coordenada de Órion é 8.'); }
+      } else if (id === 'mesa') {
+        if (!state.get('mesa')) {
+          state.set('mesa', true);
+          msg('Cartas astronômicas espalhadas. Cálculos de órbitas, rabiscos de um astrônomo obcecado. Nada conclusivo, mas bonito.');
+        } else { msg('Cartas e cálculos por toda a mesa.'); }
+      } else if (id === 'cofre') {
+        if (!state.get('cofre')) {
+          state.set('cofre', true);
+          msg('O cofre de dados está lacrado por biometria que não funciona mais. Dentro, provavelmente, o registro do tal sinal. Inacessível — e irrelevante para a fuga.');
+        } else { msg('O cofre de dados permanece lacrado.'); }
+      } else if (id === 'portaControle') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('controle'); UITabs.setActive('tabs', 'controle'); msg('De volta à sala de controle.'); });
+      }
+
+      // -- CÚPULA --
+      else if (id === 'console') {
+        abrirConsole();
+      } else if (id === 'telescopio') {
+        msg('O grande telescópio refrator. Ele aponta para onde o console de alinhamento mandar. Ajuste o alvo no console.');
+      } else if (id === 'filtros') {
+        if (!state.get('filtros')) {
+          state.set('filtros', true);
+          msg('A roda de filtros ópticos: vermelho, azul, verde, âmbar. Úteis para observar nebulosas — mas não mudam o alinhamento.');
+        } else { msg('Roda de filtros ópticos coloridos.'); }
+      } else if (id === 'escadaControle') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('controle'); UITabs.setActive('tabs', 'controle'); msg('De volta à sala de controle.'); });
+      }
+
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    // ============ PUZZLE FINAL: CONSOLE DE ALINHAMENTO (Órion + 585) ============
+    let constEscolhida = '';
+    function abrirConsole() {
+      if (state.get('vitoria')) { msg('O telescópio já travou no alvo. O sistema está aberto.'); return; }
+      constEscolhida = '';
+      const consts = ['Órion', 'Ursa Maior', 'Cassiopeia', 'Cruzeiro do Sul'];
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:8px;">🔭 Console de Alinhamento</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.82rem; margin-bottom:10px;">1) Escolha a constelação-alvo &nbsp; 2) Insira a coordenada (3 dígitos)</p>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:12px;">
+          ${consts.map(c => `<button class="cst" data-c="${c}" style="padding:8px 12px; background:#0d1024; border:1px solid #26305a; color:#c8d0ec; font-family:'Courier New'; cursor:pointer; border-radius:4px;">${c}</button>`).join('')}
+        </div>
+        <div id="cstSel" style="color:#8ab4ff; min-height:20px; margin-bottom:10px;">Constelação: —</div>
+        <input type="text" id="coordInput" maxlength="3" placeholder="_ _ _"
+          style="background:#060810; border:1px solid #26305a; color:#8ab4ff; font-family:'Courier New'; font-size:1.5rem; padding:8px; width:110px; text-align:center; border-radius:4px;">
+        <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
+          <button id="btnAlvo" style="padding:8px 22px; background:#0d1024; border:1px solid #8ab4ff; color:#8ab4ff; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Alinhar</button>
+          <button id="btnAlvoVoltar" style="padding:8px 20px; background:#0d1024; border:1px solid #26305a; color:#c8d0ec; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.querySelectorAll('.cst').forEach(b => b.addEventListener('click', () => {
+          constEscolhida = b.dataset.c;
+          document.getElementById('cstSel').textContent = 'Constelação: ' + constEscolhida;
+        }));
+        document.getElementById('btnAlvo').addEventListener('click', tentarAlvo);
+        document.getElementById('btnAlvoVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você se afasta do console.'); });
+        document.getElementById('coordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tentarAlvo(); });
+      }, 50);
+      msg('O console de alinhamento aguarda a constelação-alvo e sua coordenada de ascensão.');
+    }
+    function tentarAlvo() {
+      const coord = (document.getElementById('coordInput') || {}).value;
+      if (!constEscolhida || !coord) { msg('Escolha a constelação e digite a coordenada de 3 dígitos.'); return; }
+      if (constEscolhida === 'Órion' && coord.trim() === '585') {
+        state.set('vitoria', true);
+        UIPanel.hide('puzzle-panel');
+        escapar();
+      } else {
+        msg('❌ Alinhamento falhou. O telescópio varre o vazio. Reveja qual é "o Caçador" e cruze o mapa com o globo para a coordenada.');
+        const ci = document.getElementById('coordInput'); if (ci) ci.value = '';
+      }
+    }
+
+    // ============ ESCAPE ============
+    function escapar() {
+      timer.stop();
+      const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+      if (EscapeAPI.isLoggedIn()) {
+        EscapeAPI.registrarResultado('Sala 14 — O Observatório', 'win', tempoSeg);
+      }
+      UISuccessOverlay.show('success-overlay', {
+        title: '🔭 ALVO TRAVADO — SISTEMA REABERTO',
+        subtitle: 'O telescópio gira e trava em Órion. As portas destravam com um sopro de ar. No visor, por um instante, o sinal misterioso pisca de novo — como um adeus das estrelas.',
+        time: timer.format(),
+        links: [{ text: '← Voltar ao Lobby', href: '../index.html' }]
+      });
+    }
+
+    // ============ INPUT ============
+    input.onClick((x, y) => {
+      if (EscapeTransitions.isTransitioning()) return;
+      const obj = input.hitTest(x, y, getObjetos());
+      if (obj) interagir(obj);
+    });
+
+    // ============ RENDER ============
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'controle') renderControle(ctx, state);
+      else if (amb === 'arquivo') renderArquivo(ctx, state);
+      else renderCupula(ctx, state);
+
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) {
+        if (hovered && hovered.id === obj.id) {
+          ctx.save();
+          ctx.strokeStyle = UITokens.get('glowColor');
+          ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor');
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+          ctx.restore();
+        }
+      }
+      if (amb === 'cupula') { estrelas.update(dt); estrelas.render(ctx); }
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>
