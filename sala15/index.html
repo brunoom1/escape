@@ -47,9 +47,8 @@
     const input = EscapeInput.create(game.getCanvas(), 900, 600);
     const state = EscapeState.create({ ambiente: 'oficina', flags: {
       gaveta: false, ponteiroColetado: false, ferramentas: false,
-      relogioOk: false, xadrezOk: false, jigsawOk: false, portaAberta: false,
-      esquema: false, sokobanOk: false,
-      fragA: false, fragB: false, fragC: false
+      relogioOk: false, cacosColetados: false, mostradorOk: false, portaAberta: false,
+      esquema: false, sokobanOk: false
     }});
     const inv = EscapeInventory.create();
     const timer = EscapeTimer.create();
@@ -73,10 +72,10 @@
 
     function msg(t) { UIMessageBox.show('message', t); }
     function msgAmb(a) {
-      if (a === 'oficina') msg('A oficina do Sr. Ventura. Relógios de todos os tamanhos, um tabuleiro de xadrez com uma partida inacabada e uma bancada cheia de peças.');
-      else msg('O depósito nos fundos. Engradados pesados bloqueiam o caminho até a escotilha de saída. Um esquema desbotado está pregado na parede.');
+      if (a === 'oficina') msg('A oficina do Sr. Ventura. Relógios de todos os tamanhos e uma bancada coberta de peças e cacos.');
+      else msg('O depósito nos fundos. Engradados pesados sobre trilhos bloqueiam o caminho até a escotilha de saída. Um esquema desbotado está pregado na parede.');
     }
-    msg('O relojoeiro sumiu e trancou a oficina por dentro. Seus enigmas mecânicos guardam o caminho para fora. Ajuste, monte e empurre — antes que a oficina seja lacrada.');
+    msg('O relojoeiro sumiu e trancou a oficina por dentro. Seus enigmas mecânicos guardam o caminho para fora. Ajuste, remonte e empurre — antes que a oficina seja lacrada.');
     if (!EscapeAPI.isLoggedIn()) {
       setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
     }
@@ -86,8 +85,7 @@
     const objetosOficina = [
       { id: 'relogio', x: 100, y: 70, w: 150, h: 170, label: 'Relógio de parede' },
       { id: 'gaveta', x: 360, y: 250, w: 120, h: 60, label: 'Gaveta' },
-      { id: 'xadrez', x: 360, y: 340, w: 170, h: 100, label: 'Tabuleiro de xadrez' },
-      { id: 'jigsaw', x: 560, y: 340, w: 200, h: 100, label: 'Bancada de montagem' },
+      { id: 'bancada', x: 350, y: 340, w: 270, h: 100, label: 'Bancada de remontagem' },
       { id: 'ferramentas', x: 620, y: 90, w: 150, h: 120, label: 'Caixa de ferramentas' },
       { id: 'porta', x: 810, y: 130, w: 70, h: 310, label: 'Porta → Depósito' },
     ];
@@ -115,20 +113,17 @@
       } else if (id === 'ferramentas') {
         if (!state.get('ferramentas')) {
           state.set('ferramentas', true);
-          state.set('fragC', true);
           inv.add('bilhete', '📝', 'Bilhete: "Ventura almoçava meia hora após o meio-dia"');
-          inv.add('fragC', '🧩', 'Fragmento de foto (borda direita)');
-          msg('Na caixa de ferramentas: um bilhete — "O velho Ventura almoçava sempre meia hora após o meio-dia, nem um minuto além" — e um pedaço rasgado de uma foto (a borda direita).');
-        } else { msg('Bilhete: "meia hora após o meio-dia". E você já pegou o fragmento da foto.'); }
+          msg('Na caixa de ferramentas, um bilhete amarelado: "O velho Ventura almoçava sempre meia hora após o meio-dia, nem um minuto além."');
+        } else { msg('Bilhete: "meia hora após o meio-dia".'); }
       } else if (id === 'relogio') {
         if (state.get('relogioOk')) { msg('O relógio marca 12:30. O compartimento atrás dele está aberto.'); }
         else if (state.get('ponteiroColetado')) { abrirRelogio(); }
         else { msg('Falta o ponteiro dos minutos neste relógio. Sem ele, não dá para acertar a hora.'); }
-      } else if (id === 'xadrez') {
-        if (state.get('xadrezOk')) { msg('A partida terminou em mate. A gaveta secreta sob o tabuleiro está aberta.'); }
-        else { abrirXadrez(); }
-      } else if (id === 'jigsaw') {
-        abrirJigsaw();
+      } else if (id === 'bancada') {
+        if (state.get('mostradorOk')) { msg('O mostrador está remontado. No aro, lê-se gravado: 5 0 4.'); }
+        else if (state.get('cacosColetados')) { abrirMostrador(); }
+        else { msg('A bancada está cheia de peças, mas faltam os cacos do mostrador. Devem estar guardados em algum lugar seguro.'); }
       } else if (id === 'porta') {
         if (state.get('portaAberta')) {
           EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('deposito'); UITabs.setActive('tabs', 'deposito'); msgAmb('deposito'); });
@@ -139,14 +134,14 @@
       else if (id === 'esquema') {
         if (!state.get('esquema')) {
           state.set('esquema', true);
-          msg('O esquema mostra a planta do depósito: o engradado deve ser empurrado até o "X" marcado no canto — só assim a escotilha destrava.');
-        } else { msg('Esquema: empurrar o engradado até o "X" no canto libera a escotilha.'); }
+          msg('O esquema mostra a planta do depósito: cada engradado precisa repousar sobre uma marca "✕". Os trilhos só permitem empurrar, nunca puxar — a nota de Ventura no canto adverte: "Pense de que lado se coloca antes de empurrar, ou ficará preso."');
+        } else { msg('Esquema: os engradados vão sobre as marcas "✕". Só é possível empurrar; posicione-se do lado certo.'); }
       } else if (id === 'blocos') {
-        if (state.get('sokobanOk')) { msg('O engradado já está sobre o "X". A escotilha destravou.'); }
+        if (state.get('sokobanOk')) { msg('Os engradados já estão sobre as marcas "✕". A escotilha destravou.'); }
         else { abrirSokoban(); }
       } else if (id === 'escotilha') {
         if (state.get('sokobanOk')) { escapar(); }
-        else { msg('A escotilha está travada. Algo pesado precisa pressionar a placa marcada com "X".'); }
+        else { msg('A escotilha está travada. As duas placas marcadas com "✕" precisam estar pressionadas por engradados.'); }
       } else if (id === 'voltar') {
         EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('oficina'); UITabs.setActive('tabs', 'oficina'); msg('De volta à oficina.'); });
       }
@@ -154,14 +149,7 @@
       UIInventory.render('inventory', inv.getAll());
     }
 
-    function checarFragmentos() {
-      // pista quando os 3 fragmentos estão coletados
-      if (state.get('fragA') && state.get('fragB') && state.get('fragC') && !state.get('jigsawOk')) {
-        msg('Você tem os 3 fragmentos da foto (A: relógio, B: xadrez, C: ferramentas). Monte-os na bancada.');
-      }
-    }
-
-    // ============ PUZZLE 1: RELÓGIO (manipulativo — ajustar até 12:30) ============
+    // ============ PUZZLE 1: RELÓGIO (ajustar até 12:30) ============
     let relHora = 12, relMin = 0;
     function abrirRelogio() {
       relHora = 12; relMin = 0;
@@ -170,8 +158,8 @@
         <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.82rem; margin-bottom:10px;">Gire os ponteiros até o horário do enigma.</p>
         <svg id="relSvg" width="150" height="150" viewBox="0 0 150 150" style="display:block; margin:0 auto 10px;">
           <circle cx="75" cy="75" r="70" fill="#0e0b07" stroke="#d9a441" stroke-width="3"/>
-          <line id="hHora" x1="75" y1="75" x2="75" y2="38" stroke="#e6d6b8" stroke-width="5" stroke-linecap="round"/>
-          <line id="hMin" x1="75" y1="75" x2="75" y2="20" stroke="#d9a441" stroke-width="3" stroke-linecap="round"/>
+          <line id="hHora" x1="75" y1="75" x2="75" y2="40" stroke="#e6d6b8" stroke-width="5" stroke-linecap="round"/>
+          <line id="hMin" x1="75" y1="75" x2="75" y2="22" stroke="#d9a441" stroke-width="3" stroke-linecap="round"/>
           <circle cx="75" cy="75" r="4" fill="#d9a441"/>
         </svg>
         <div id="relTime" style="font-size:1.4rem; color:${UITokens.get('colorAccent')}; margin-bottom:12px;">12:00</div>
@@ -201,12 +189,11 @@
         document.getElementById('mMenos').addEventListener('click', () => { relMin = (relMin + 55) % 60; upd(); });
         document.getElementById('relConfirm').addEventListener('click', () => {
           if (relHora === 12 && relMin === 30) {
-            state.set('relogioOk', true); state.set('fragA', true);
+            state.set('relogioOk', true); state.set('cacosColetados', true);
             UIPanel.hide('puzzle-panel');
-            inv.add('fragA', '🧩', 'Fragmento de foto (parte esquerda)');
+            inv.add('cacos', '🧩', 'Cacos do mostrador de um relógio');
             UIInventory.render('inventory', inv.getAll());
-            msg('✅ Tique-taque! Aos 12:30, um compartimento range atrás do relógio e cospe um fragmento de foto (a parte esquerda).');
-            checarFragmentos();
+            msg('✅ Tique-taque! Aos 12:30, um compartimento range atrás do relógio e revela os cacos de um velho mostrador. Leve-os à bancada para remontar.');
           } else {
             msg('O relógio não reage. Reveja a pista sobre o horário de almoço de Ventura.');
           }
@@ -217,92 +204,122 @@
       msg('O relógio de parede tem os ponteiros livres. Gire-os até o horário certo.');
     }
 
-    // ============ PUZZLE 2: XADREZ (manipulativo — clicar na casa do mate-em-1) ============
-    // Posição: Rei preto em g8, Dama branca em g1, coluna g aberta. Mate = Dama para g7.
-    function abrirXadrez() {
-      const files = ['a','b','c','d','e','f','g','h'];
-      const pieces = { g8: '♚', g1: '♕', b8: '♜', e7: '♟' };
-      let cells = '';
-      for (let r = 8; r >= 1; r--) {
-        for (let c = 0; c < 8; c++) {
-          const cid = files[c] + r;
-          const dark = (r + c) % 2 === 0;
-          const bg = dark ? '#3a2a18' : '#c9b48a';
-          const fg = pieces[cid] && ['♚','♜','♟'].includes(pieces[cid]) ? '#111' : '#f4ecd8';
-          cells += '<button class="xcell" data-c="' + cid + '" style="width:34px;height:34px;padding:0;border:none;background:' + bg + ';color:' + fg + ';font-size:20px;cursor:pointer;">' + (pieces[cid] || '') + '</button>';
+    // ============ PUZZLE 2: REMONTAGEM DO MOSTRADOR (quebra-cabeça deslizante) ============
+    // A figura é um mostrador de relógio 300x300 com "504" gravado. Fatiada em 3x3.
+    // Quebra-cabeça deslizante (8-puzzle): há UM espaço vazio; clicar numa peça
+    // vizinha ao vazio desliza-a para lá, abrindo um novo vazio. O vazio "mora" no
+    // canto inferior-direito (cell 8), onde não há dígitos — o "504" (linha do meio)
+    // fica legível quando montado. Embaralhado por jogadas legais => sempre solúvel.
+    function buildPicInner() {
+      let ticks = '';
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const x1 = 150 + Math.cos(a) * 132, y1 = 150 + Math.sin(a) * 132;
+        const x2 = 150 + Math.cos(a) * 120, y2 = 150 + Math.sin(a) * 120;
+        ticks += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="#8f7a58" stroke-width="3"/>';
+      }
+      return '' +
+        '<rect x="0" y="0" width="300" height="300" fill="#15110b"/>' +
+        '<circle cx="150" cy="150" r="145" fill="#0e0b07" stroke="#d9a441" stroke-width="6"/>' +
+        '<circle cx="150" cy="150" r="118" fill="none" stroke="#5a4126" stroke-width="2"/>' +
+        ticks +
+        '<text x="150" y="58" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#8f7a58">VENTURA</text>' +
+        '<line x1="150" y1="150" x2="150" y2="78" stroke="#e6d6b8" stroke-width="4" stroke-linecap="round"/>' +
+        '<line x1="150" y1="150" x2="206" y2="150" stroke="#e6d6b8" stroke-width="3" stroke-linecap="round"/>' +
+        '<circle cx="150" cy="150" r="6" fill="#d9a441"/>' +
+        '<text x="52" y="205" font-family="Courier New, monospace" font-size="80" font-weight="bold" fill="#d9a441">5</text>' +
+        '<text x="118" y="205" font-family="Courier New, monospace" font-size="80" font-weight="bold" fill="#d9a441">0</text>' +
+        '<text x="196" y="205" font-family="Courier New, monospace" font-size="80" font-weight="bold" fill="#d9a441">4</text>';
+    }
+    const PIC_INNER = buildPicInner();
+    function tileSvg(slice) {
+      const col = slice % 3, row = Math.floor(slice / 3);
+      return '<svg width="90" height="90" viewBox="' + (col * 100) + ' ' + (row * 100) + ' 100 100" style="display:block;">' + PIC_INNER + '</svg>';
+    }
+    const MOST_BLANK = 8;                 // slice 8 (canto inf-dir) é o espaço vazio
+    let mostBoard = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    let mostBlank = 8;                     // índice da célula vazia
+    function mostNeighbors(cell) {
+      const r = Math.floor(cell / 3), c = cell % 3, out = [];
+      if (r > 0) out.push(cell - 3);
+      if (r < 2) out.push(cell + 3);
+      if (c > 0) out.push(cell - 1);
+      if (c < 2) out.push(cell + 1);
+      return out;
+    }
+    function mostSlide(cell) {             // desliza a peça de 'cell' para o vazio (se vizinha)
+      if (!mostNeighbors(mostBlank).includes(cell)) return false;
+      mostBoard[mostBlank] = mostBoard[cell];
+      mostBoard[cell] = MOST_BLANK;
+      mostBlank = cell;
+      return true;
+    }
+    function mostScramble() {
+      mostBoard = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+      mostBlank = 8;
+      let last = -1;
+      for (let i = 0; i < 80; i++) {
+        const opts = mostNeighbors(mostBlank).filter(n => n !== last);
+        const pick = opts[Math.floor(Math.random() * opts.length)];
+        last = mostBlank;
+        mostSlide(pick);
+      }
+      if (mostBoard.every((v, i) => v === i)) mostScramble();  // nunca começar resolvido
+    }
+    function mostRenderGrid() {
+      const movable = mostNeighbors(mostBlank);
+      let g = '<div id="mostGrid" style="display:grid; grid-template-columns:repeat(3,90px); gap:3px; justify-content:center; margin:0 auto 12px; width:max-content; background:#4a3a22; padding:3px; border-radius:4px;">';
+      for (let cell = 0; cell < 9; cell++) {
+        const val = mostBoard[cell];
+        if (val === MOST_BLANK) {
+          g += '<div class="mtile" data-cell="' + cell + '" style="width:90px;height:90px;background:#0e0b07;border:1px dashed #4a3a22;box-sizing:border-box;"></div>';
+        } else {
+          const canMove = movable.includes(cell) && !state.get('mostradorOk');
+          const style = 'width:90px;height:90px;overflow:hidden;box-sizing:border-box;cursor:' + (canMove ? 'pointer' : 'default') + ';' + (canMove ? 'box-shadow:inset 0 0 0 2px rgba(79,199,168,0.55);' : '');
+          g += '<div class="mtile" data-cell="' + cell + '" style="' + style + '">' + tileSvg(val) + '</div>';
         }
       }
+      g += '</div>';
+      return g;
+    }
+    function abrirMostrador() {
+      if (state.get('mostradorOk')) { msg('O mostrador já está remontado — lê-se 5 0 4 gravado no aro.'); return; }
+      mostScramble();
       const html = `
-        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">♟️ Partida inacabada — as brancas jogam</p>
-        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:10px;">Clique na casa que dá xeque-mate em um lance.</p>
-        <div style="display:grid; grid-template-columns:repeat(8,34px); gap:0; justify-content:center; margin:0 auto 12px; width:max-content; border:3px solid #4a3a22;">${cells}</div>
-        <div style="display:flex; gap:10px; justify-content:center;">
-          <button id="xVoltar" style="padding:8px 20px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">🧩 Remonte o mostrador</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:10px;">Há um espaço vazio. Clique numa peça vizinha ao vazio para deslizá-la para lá. Continue até a figura ficar correta e leia o que está gravado.</p>
+        <div id="mostWrap">${mostRenderGrid()}</div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:6px;">
+          <button id="mostReset" style="padding:8px 18px; background:#1c1710; border:1px solid #d4643a; color:#d4643a; font-family:monospace; cursor:pointer; border-radius:4px;">Embaralhar</button>
+          <button id="mostVoltar" style="padding:8px 20px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
         </div>`;
       UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
-      setTimeout(() => {
-        document.querySelectorAll('.xcell').forEach(b => b.addEventListener('click', () => {
-          if (b.dataset.c === 'g7') {
-            state.set('xadrezOk', true); state.set('fragB', true);
-            UIPanel.hide('puzzle-panel');
-            inv.add('fragB', '🧩', 'Fragmento de foto (parte central)');
-            UIInventory.render('inventory', inv.getAll());
-            msg('✅ Dama em g7 — xeque-mate! Um clique ecoa sob o tabuleiro e a gaveta secreta se abre: mais um fragmento da foto (parte central).');
-          } else {
-            msg('Esse lance não encerra a partida. Lembre: a Dama encurrala o Rei na casa colada a ele, na mesma coluna.');
-          }
-        }));
-        document.getElementById('xVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você recua do tabuleiro.'); });
-      }, 50);
-      msg('Uma partida parada a um lance do fim. A Dama branca (coluna g) pode terminar tudo. Um livro de aberturas na bancada anota: "a Dama termina o que os peões começaram — colada ao Rei."');
+      setTimeout(bindMost, 50);
+      msg('Na bancada, os cacos do mostrador. Deslize-os pelo espaço vazio até a figura fazer sentido.');
+    }
+    function bindMost() {
+      document.querySelectorAll('.mtile').forEach(t => t.addEventListener('click', () => {
+        if (state.get('mostradorOk')) return;
+        const cell = parseInt(t.dataset.cell);
+        if (!mostSlide(cell)) return;
+        if (mostBoard.every((v, i) => v === i)) { mostSolved(); return; }
+        document.getElementById('mostWrap').innerHTML = mostRenderGrid();
+        bindMost();
+      }));
+      const rb = document.getElementById('mostReset');
+      if (rb) rb.addEventListener('click', () => { mostScramble(); document.getElementById('mostWrap').innerHTML = mostRenderGrid(); bindMost(); msg('Peças embaralhadas novamente.'); });
+      const vb = document.getElementById('mostVoltar');
+      if (vb) vb.addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você deixa a remontagem de lado.'); });
+    }
+    function mostSolved() {
+      state.set('mostradorOk', true);
+      document.getElementById('mostWrap').innerHTML = mostRenderGrid();
+      msg('✅ A última peça desliza no lugar e o mostrador se forma: o rosto de um relógio antigo. Gravado no aro, agora legível: "5 0 4". Deve ser o código da porta!');
+      inv.add('codigo', '🔢', 'Mostrador remontado: gravado 5-0-4');
+      UIInventory.render('inventory', inv.getAll());
     }
 
-    // ============ PUZZLE 3: JIGSAW (manipulativo — montar a foto) ============
-    function abrirJigsaw() {
-      if (state.get('jigsawOk')) { msg('A foto já está montada. O código revelado é 7-3-0.'); return; }
-      if (!(state.get('fragA') && state.get('fragB') && state.get('fragC'))) {
-        msg('Faltam fragmentos da foto. Encontre os três (relógio, xadrez, ferramentas) antes de montar.');
-        return;
-      }
-      const opt = (v, t) => '<option value="' + v + '">' + t + '</option>';
-      const sel = (idSlot) => '<select id="' + idSlot + '" style="background:#15110b;border:1px solid #4a3a22;color:#d9a441;padding:6px;font-family:monospace;border-radius:4px;">' +
-        opt('', '—') + opt('A', 'Frag. A') + opt('B', 'Frag. B') + opt('C', 'Frag. C') + '</select>';
-      const html = `
-        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">🧩 Monte a foto rasgada</p>
-        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:12px;">Coloque cada fragmento na sua posição. Cada descrição diz onde ele fica.</p>
-        <div style="display:flex; gap:14px; justify-content:center; align-items:flex-end; margin-bottom:14px;">
-          <div><div style="color:#8f7a58; font-size:0.75rem; margin-bottom:4px;">Esquerda</div>${sel('slotL')}</div>
-          <div><div style="color:#8f7a58; font-size:0.75rem; margin-bottom:4px;">Centro</div>${sel('slotC')}</div>
-          <div><div style="color:#8f7a58; font-size:0.75rem; margin-bottom:4px;">Direita</div>${sel('slotR')}</div>
-        </div>
-        <div id="jigMsg" style="color:#4fc7a8; min-height:20px; margin-bottom:10px;"></div>
-        <div style="display:flex; gap:10px; justify-content:center;">
-          <button id="jigOk" style="padding:8px 22px; background:#1c1710; border:1px solid #d9a441; color:#d9a441; font-family:monospace; cursor:pointer; border-radius:4px;">Montar</button>
-          <button id="jigVoltar" style="padding:8px 20px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
-        </div>`;
-      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
-      setTimeout(() => {
-        document.getElementById('jigOk').addEventListener('click', () => {
-          const l = document.getElementById('slotL').value;
-          const c = document.getElementById('slotC').value;
-          const r = document.getElementById('slotR').value;
-          if (!l || !c || !r) { document.getElementById('jigMsg').textContent = 'Preencha as três posições.'; return; }
-          if (l === 'A' && c === 'B' && r === 'C') {
-            state.set('jigsawOk', true);
-            UIPanel.hide('puzzle-panel');
-            inv.add('codigoFoto', '🔢', 'Foto montada: número 7-3-0 rabiscado atrás');
-            UIInventory.render('inventory', inv.getAll());
-            msg('✅ A foto se completa: é o Sr. Ventura diante da porta do depósito. Atrás dela, a lápis: "7 3 0". É o código da porta!');
-          } else {
-            document.getElementById('jigMsg').textContent = 'As bordas não se alinham assim. Releia onde cada fragmento pertence.';
-          }
-        });
-        document.getElementById('jigVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você deixa a montagem de lado.'); });
-      }, 50);
-      msg('Na bancada, três slots para os fragmentos: esquerda, centro e direita.');
-    }
-
-    // ============ PORTA BLINDADA (código 730 revelado pela foto) ============
+    // ============ PORTA BLINDADA (código 504, lido no mostrador) ============
     function abrirPorta() {
       const html = `
         <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🔒 Porta do Depósito — 3 dígitos</p>
@@ -317,10 +334,10 @@
         document.getElementById('portaInput').focus();
         const tenta = () => {
           const el = document.getElementById('portaInput');
-          if (el.value.trim() === '730') {
+          if (el.value.trim() === '504') {
             state.set('portaAberta', true); UITabs.unlock('tabs', 'deposito'); UIPanel.hide('puzzle-panel');
             msg('✅ A porta blindada destrava com um estalo pesado. O depósito está aberto.');
-          } else { msg('❌ Código incorreto. A foto montada revela o número certo.'); el.value = ''; el.focus(); }
+          } else { msg('❌ Código incorreto. O número está gravado no mostrador remontado.'); el.value = ''; el.focus(); }
         };
         document.getElementById('portaOk').addEventListener('click', tenta);
         document.getElementById('portaVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você recua da porta.'); });
@@ -329,32 +346,94 @@
       msg('A porta blindada pede um código de 3 dígitos.');
     }
 
-    // ============ PUZZLE 4: SOKOBAN (manipulativo — empurrar o engradado até o X) ============
-    const SOKO_ROWS = 3, SOKO_COLS = 5;
-    const SOKO_WALLS = ['1,1', '1,3'];
-    const SOKO_TARGET = { r: 2, c: 4 };
-    let sokoCrate = { r: 0, c: 0 };
+    // ============ PUZZLE 3: SOKOBAN (empurrar engradados até as marcas) ============
+    // Sokoban de verdade: um operário empurra (nunca puxa) os engradados.
+    // TRÊS engradados ▩ devem cobrir as TRÊS marcas ✕, numa sala 6x7 murada.
+    // Paredes internas (2,3) e (3,3) partem a sala em duas zonas ligadas só pela
+    // fileira de cima e pela marca central — obriga a rodear, planejar a ordem e
+    // o lado de cada empurrão. Solução verificada à mão; Reiniciar recupera becos.
+    const SOKO_ROWS = 6, SOKO_COLS = 7;
+    const SOKO_INNER_WALLS = ['2,3', '3,3'];
+    const SOKO_WALLS = (() => {
+      const w = new Set(SOKO_INNER_WALLS);
+      for (let c = 0; c < SOKO_COLS; c++) { w.add('0,' + c); w.add((SOKO_ROWS - 1) + ',' + c); }
+      for (let r = 0; r < SOKO_ROWS; r++) { w.add(r + ',0'); w.add(r + ',' + (SOKO_COLS - 1)); }
+      return w;
+    })();
+    const SOKO_TARGETS = ['1,1', '1,5', '4,3'];
+    const SOKO_INIT = { player: { r: 4, c: 5 }, boxes: [{ r: 2, c: 1 }, { r: 2, c: 5 }, { r: 4, c: 2 }] };
+    let sokoPlayer, sokoBoxes, sokoMoves = 0;
+    const sokoKey = (r, c) => r + ',' + c;
+    const sokoInside = (r, c) => r >= 0 && r < SOKO_ROWS && c >= 0 && c < SOKO_COLS;
+    function sokoReset() {
+      sokoPlayer = { r: SOKO_INIT.player.r, c: SOKO_INIT.player.c };
+      sokoBoxes = SOKO_INIT.boxes.map(b => ({ r: b.r, c: b.c }));
+      sokoMoves = 0;
+    }
     function sokoRender() {
-      let g = '<div style="display:grid; grid-template-columns:repeat(' + SOKO_COLS + ',40px); gap:3px; justify-content:center; margin:0 auto 12px; width:max-content;">';
+      let g = '<div style="display:grid; grid-template-columns:repeat(' + SOKO_COLS + ',38px); gap:2px; justify-content:center; margin:0 auto 10px; width:max-content; background:#4a3a22; padding:3px; border-radius:4px;">';
       for (let r = 0; r < SOKO_ROWS; r++) for (let c = 0; c < SOKO_COLS; c++) {
-        const isWall = SOKO_WALLS.includes(r + ',' + c);
-        const isTarget = SOKO_TARGET.r === r && SOKO_TARGET.c === c;
-        const isCrate = sokoCrate.r === r && sokoCrate.c === c;
-        let bg = '#15110b', content = '';
-        if (isWall) { bg = '#3a2a18'; content = '█'; }
-        else if (isTarget) { bg = '#221108'; content = '<span style="color:#d4643a;font-weight:bold;">✕</span>'; }
-        if (isCrate) { bg = isTarget ? '#1a3a30' : '#5a4126'; content = '<span style="color:#e6d6b8;">▩</span>'; }
-        g += '<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:' + bg + ';border:1px solid #4a3a22;font-size:18px;">' + content + '</div>';
+        const key = sokoKey(r, c);
+        const isWall = SOKO_WALLS.has(key);
+        const isTarget = SOKO_TARGETS.includes(key);
+        const isBox = sokoBoxes.some(b => b.r === r && b.c === c);
+        const isPlayer = sokoPlayer.r === r && sokoPlayer.c === c;
+        let bg = '#15110b', content = '', color = '#e6d6b8';
+        if (isWall) { bg = '#3a2a18'; content = '█'; color = '#5a4126'; }
+        else if (isTarget) { bg = '#221108'; content = '✕'; color = '#d4643a'; }
+        if (isBox) { bg = isTarget ? '#1a3a30' : '#5a4126'; content = '▩'; color = isTarget ? '#4fc7a8' : '#e6d6b8'; }
+        if (isPlayer) { content = '◉'; color = '#4fc7a8'; bg = isTarget ? '#221108' : '#1c2a24'; }
+        g += '<div style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:' + bg + ';border:1px solid #4a3a22;font-size:18px;color:' + color + ';">' + content + '</div>';
       }
       g += '</div>';
       return g;
     }
+    function sokoRefresh() {
+      const grid = document.getElementById('sokoGrid'); if (grid) grid.innerHTML = sokoRender();
+      const mv = document.getElementById('sokoMoves'); if (mv) mv.textContent = 'Movimentos: ' + sokoMoves;
+    }
+    function sokoMove(dr, dc) {
+      if (state.get('sokobanOk')) return;
+      const nr = sokoPlayer.r + dr, nc = sokoPlayer.c + dc;
+      if (!sokoInside(nr, nc) || SOKO_WALLS.has(sokoKey(nr, nc))) return;
+      const boxIdx = sokoBoxes.findIndex(b => b.r === nr && b.c === nc);
+      if (boxIdx >= 0) {
+        // Só empurra: a célula além do engradado precisa estar livre
+        const br = nr + dr, bc = nc + dc;
+        if (!sokoInside(br, bc) || SOKO_WALLS.has(sokoKey(br, bc)) || sokoBoxes.some(b => b.r === br && b.c === bc)) return;
+        sokoBoxes[boxIdx] = { r: br, c: bc };
+      }
+      sokoPlayer = { r: nr, c: nc };
+      sokoMoves++;
+      sokoRefresh();
+      if (SOKO_TARGETS.every(t => sokoBoxes.some(b => sokoKey(b.r, b.c) === t))) {
+        state.set('sokobanOk', true);
+        document.removeEventListener('keydown', sokoKeydown);
+        setTimeout(() => { UIPanel.hide('puzzle-panel'); msg('✅ Os dois engradados assentam sobre as marcas "✕" com um baque surdo. As placas afundam e a escotilha de saída destrava!'); }, 450);
+      }
+    }
+    function sokoKeydown(e) {
+      let dr = 0, dc = 0;
+      const k = e.key;
+      if (k === 'ArrowUp' || k === 'w' || k === 'W') dr = -1;
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') dr = 1;
+      else if (k === 'ArrowLeft' || k === 'a' || k === 'A') dc = -1;
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D') dc = 1;
+      else return;
+      e.preventDefault();
+      sokoMove(dr, dc);
+    }
+    function sokoClose() {
+      document.removeEventListener('keydown', sokoKeydown);
+      UIPanel.hide('puzzle-panel');
+    }
     function abrirSokoban() {
-      sokoCrate = { r: 0, c: 0 };
+      sokoReset();
       const btn = (id, t) => '<button id="' + id + '" style="padding:10px 16px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; font-size:1.1rem; cursor:pointer; border-radius:4px;">' + t + '</button>';
       const html = `
-        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">📦 Empurre o engradado</p>
-        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:12px;">Leve o engradado (▩) até a marca (✕).</p>
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">📦 Empurre os engradados</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:4px;">Você (<span style="color:#4fc7a8;">◉</span>) só consegue <b>empurrar</b> — nunca puxar. Leve os três engradados (▩) até as marcas (✕). Planeje a ordem: um engradado num canto errado trava o caminho.</p>
+        <p id="sokoMoves" style="color:${UITokens.get('colorTextMuted')}; font-size:0.75rem; margin-bottom:10px;">Movimentos: 0</p>
         <div id="sokoGrid">${sokoRender()}</div>
         <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
           ${btn('sUp', '▲')}
@@ -366,28 +445,15 @@
         </div>`;
       UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
       setTimeout(() => {
-        const mover = (dr, dc) => {
-          const nr = sokoCrate.r + dr, nc = sokoCrate.c + dc;
-          if (nr < 0 || nr >= SOKO_ROWS || nc < 0 || nc >= SOKO_COLS) return;
-          if (SOKO_WALLS.includes(nr + ',' + nc)) return;
-          sokoCrate = { r: nr, c: nc };
-          document.getElementById('sokoGrid').innerHTML = sokoRender();
-          if (sokoCrate.r === SOKO_TARGET.r && sokoCrate.c === SOKO_TARGET.c) {
-            state.set('sokobanOk', true);
-            setTimeout(() => {
-              UIPanel.hide('puzzle-panel');
-              msg('✅ O engradado desliza sobre a marca "✕" com um baque. A placa de pressão afunda e a escotilha de saída destrava!');
-            }, 400);
-          }
-        };
-        document.getElementById('sUp').addEventListener('click', () => mover(-1, 0));
-        document.getElementById('sDown').addEventListener('click', () => mover(1, 0));
-        document.getElementById('sLeft').addEventListener('click', () => mover(0, -1));
-        document.getElementById('sRight').addEventListener('click', () => mover(0, 1));
-        document.getElementById('sReset').addEventListener('click', () => { sokoCrate = { r: 0, c: 0 }; document.getElementById('sokoGrid').innerHTML = sokoRender(); });
-        document.getElementById('sVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você deixa os engradados.'); });
+        document.getElementById('sUp').addEventListener('click', () => sokoMove(-1, 0));
+        document.getElementById('sDown').addEventListener('click', () => sokoMove(1, 0));
+        document.getElementById('sLeft').addEventListener('click', () => sokoMove(0, -1));
+        document.getElementById('sRight').addEventListener('click', () => sokoMove(0, 1));
+        document.getElementById('sReset').addEventListener('click', () => { sokoReset(); sokoRefresh(); msg('Engradados de volta ao lugar. Lembre-se: você só empurra.'); });
+        document.getElementById('sVoltar').addEventListener('click', () => { sokoClose(); msg('Você deixa os engradados.'); });
+        document.addEventListener('keydown', sokoKeydown);
       }, 50);
-      msg('Um engradado pesado sobre trilhos de madeira. Empurre-o na direção certa até a marca no piso.');
+      msg('Engradados pesados sobre o piso do depósito. Use as setas (ou ◀▲▼▶) para se mover e empurrá-los. Você nunca puxa — planeje de que lado se posicionar.');
     }
 
     // ============ ESCAPE ============

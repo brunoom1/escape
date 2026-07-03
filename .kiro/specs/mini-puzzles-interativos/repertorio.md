@@ -28,12 +28,10 @@ Conteúdo foi reformulado a partir de referências públicas sobre design de puz
 - **Anti-spoiler:** nunca escrever "12:30" literalmente — deduzir de descrição.
 - **Exemplo:** ajustar para 12:30 abre a portinhola atrás do relógio.
 
-### 2. Xadrez — Lance Decisivo (Chess Move)
-- **Interação:** um tabuleiro com uma partida em andamento; o jogador clica na casa de destino da peça que dá xeque-mate (ou o próximo lance correto).
-- **Liberação:** o lance certo destrava uma gaveta / revela um dígito.
-- **Pistas (2+):** um livro de aberturas marca a peça-chave; um bilhete diz "mate em um".
+### 2. Xadrez — Lance Decisivo (Chess Move) ⚠️ USO RESTRITO
+- **Interação:** um tabuleiro com uma partida em andamento; o jogador clica na casa de destino da peça que dá xeque-mate.
+- **⚠️ Acessibilidade (lição da Sala 15):** exige conhecimento de xadrez — **NÃO usar como puzzle obrigatório**. A maioria dos jogadores não joga xadrez, o que frustra e quebra o ritmo. Só usar como puzzle **opcional/bônus** ou em salas explicitamente temáticas de xadrez, sempre com uma alternativa.
 - **Anti-spoiler:** exige ler a posição; não indicar a casa exata.
-- **Exemplo:** "Dama em h5 → mate" — clicar na casa correta.
 
 ### 3. Blocos Deslizantes / Empurrar Caixas (Sokoban)
 - **Interação:** grade onde o jogador empurra blocos (setas) até uma marca no chão.
@@ -42,12 +40,12 @@ Conteúdo foi reformulado a partir de referências públicas sobre design de puz
 - **Anti-spoiler:** a solução é espacial, não numérica.
 - **Exemplo:** empurrar a caixa pesada sobre a placa de pressão libera a saída.
 
-### 4. Quebra-Cabeça / Montagem (Jigsaw / Assembly)
-- **Interação:** fragmentos de uma foto/mapa/documento são coletados e reordenados em slots; ou peças giradas até encaixar.
-- **Liberação:** montado corretamente, revela um código, símbolo ou rota.
-- **Pistas (2+):** numeração no verso; formato das bordas; cor de fundo contínua.
-- **Anti-spoiler:** o código só aparece quando a imagem está completa.
-- **Exemplo:** montar 3 pedaços de uma foto revela o número rabiscado atrás.
+### 4. Quebra-Cabeça / Remontagem de Imagem (Jigsaw / Assembly)
+- **Interação:** peças que são **fatias de uma imagem real** (foto/mostrador/mapa) embaralhadas; o jogador as **troca de posição** (ou desliza) até a figura se formar.
+- **REGRA OBRIGATÓRIA (lição da Sala 15):** as peças DEVEM compor visualmente uma figura coerente — as bordas precisam se alinhar de verdade. **NUNCA** rotular peças ("esta é a da esquerda") nem resolver por dropdown de posição: isso não é quebra-cabeça, é preencher formulário e mata a graça.
+- **Implementação recomendada:** desenhar a imagem (SVG/Canvas) e fatiar por `viewBox`/`background-position` em NxN; o jogador troca tiles clicando em dois; resolvido quando todos estão na célula de origem.
+- **Liberação:** a figura completa **mostra visualmente** um código/símbolo que o jogador **lê da própria imagem** (nunca de um texto na peça).
+- **Exemplo (Sala 15):** remontar o mostrador de um relógio revela o número "504" gravado no aro.
 
 ### 5. Encaixe de Peças / Peça Deslocada (Displaced Object)
 - **Interação:** um objeto que "não pertence" ao lugar (ex.: engrenagem no chão) deve ser levado ao ponto correto próximo (eixo vazio, suporte, nicho).
