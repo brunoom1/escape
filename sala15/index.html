@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala 15 — A Oficina do Relojoeiro</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; background: #0c0a07; color: #e6d6b8; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+    #tabs { width: 100%; max-width: 910px; }
+    #game-wrapper { position: relative; width: 900px; max-width: 100%; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #4a3a22; cursor: crosshair; }
+    #puzzle-panel, #success-overlay { position: absolute; inset: 0; }
+    #message, #inventory { width: 100%; max-width: 910px; }
+  </style>
+</head>
+<body>
+  <div id="tabs"></div>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+    <div id="puzzle-panel"></div>
+    <div id="success-overlay"></div>
+  </div>
+  <div id="message"></div>
+  <div id="inventory"></div>
+
+  <script src="../lib/api.js"></script>
+  <script src="../lib/engine.js"></script>
+  <script src="../lib/input.js"></script>
+  <script src="../lib/state.js"></script>
+  <script src="../lib/inventory.js"></script>
+  <script src="../lib/transitions.js"></script>
+  <script src="../lib/timer.js"></script>
+  <script src="../lib/particles.js"></script>
+  <script src="../ui-kit/tokens.js"></script>
+  <script src="../ui-kit/themes/clockwork.js"></script>
+  <script src="../ui-kit/components/inventory.js"></script>
+  <script src="../ui-kit/components/tabs.js"></script>
+  <script src="../ui-kit/components/message-box.js"></script>
+  <script src="../ui-kit/components/panel.js"></script>
+  <script src="../ui-kit/components/success-overlay.js"></script>
+  <script src="render.js"></script>
+
+  <script>
+    UITokens.apply(ThemeClockwork);
+    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0c0a07' });
+    const input = EscapeInput.create(game.getCanvas(), 900, 600);
+    const state = EscapeState.create({ ambiente: 'oficina', flags: {
+      gaveta: false, ponteiroColetado: false, ferramentas: false,
+      relogioOk: false, xadrezOk: false, jigsawOk: false, portaAberta: false,
+      esquema: false, sokobanOk: false,
+      fragA: false, fragB: false, fragC: false
+    }});
+    const inv = EscapeInventory.create();
+    const timer = EscapeTimer.create();
+
+    UITabs.create('tabs', [
+      { id: 'oficina', label: 'Oficina', locked: false },
+      { id: 'deposito', label: 'Depósito', locked: true }
+    ], (tabId) => {
+      if (tabId === 'deposito' && !state.get('portaAberta')) {
+        msg('A porta blindada do depósito está trancada por um teclado numérico.');
+        UITabs.setActive('tabs', 'oficina'); return;
+      }
+      EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente(tabId); msgAmb(tabId); });
+    });
+
+    UIMessageBox.create('message');
+    UIInventory.create('inventory');
+    UIPanel.create('puzzle-panel');
+    UISuccessOverlay.create('success-overlay');
+    const motes = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(217,164,65,0.12)', count: 16, speedX: [-0.3,0.3], speedY: [0.1,0.6], size: [0.8,1.6], life: [6,12] });
+
+    function msg(t) { UIMessageBox.show('message', t); }
+    function msgAmb(a) {
+      if (a === 'oficina') msg('A oficina do Sr. Ventura. Relógios de todos os tamanhos, um tabuleiro de xadrez com uma partida inacabada e uma bancada cheia de peças.');
+      else msg('O depósito nos fundos. Engradados pesados bloqueiam o caminho até a escotilha de saída. Um esquema desbotado está pregado na parede.');
+    }
+    msg('O relojoeiro sumiu e trancou a oficina por dentro. Seus enigmas mecânicos guardam o caminho para fora. Ajuste, monte e empurre — antes que a oficina seja lacrada.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
+    timer.start();
+
+    // ============ OBJETOS (posições = render.js) ============
+    const objetosOficina = [
+      { id: 'relogio', x: 100, y: 70, w: 150, h: 170, label: 'Relógio de parede' },
+      { id: 'gaveta', x: 360, y: 250, w: 120, h: 60, label: 'Gaveta' },
+      { id: 'xadrez', x: 360, y: 340, w: 170, h: 100, label: 'Tabuleiro de xadrez' },
+      { id: 'jigsaw', x: 560, y: 340, w: 200, h: 100, label: 'Bancada de montagem' },
+      { id: 'ferramentas', x: 620, y: 90, w: 150, h: 120, label: 'Caixa de ferramentas' },
+      { id: 'porta', x: 810, y: 130, w: 70, h: 310, label: 'Porta → Depósito' },
+    ];
+    const objetosDeposito = [
+      { id: 'esquema', x: 60, y: 80, w: 160, h: 140, label: 'Esquema na parede' },
+      { id: 'blocos', x: 330, y: 240, w: 260, h: 200, label: 'Engradados' },
+      { id: 'escotilha', x: 740, y: 360, w: 130, h: 130, label: 'Escotilha de saída' },
+      { id: 'voltar', x: 30, y: 480, w: 100, h: 60, label: '← Oficina' },
+    ];
+    function getObjetos() { return state.getAmbiente() === 'oficina' ? objetosOficina : objetosDeposito; }
+
+    // ============ INTERAÇÕES ============
+    function interagir(obj) {
+      if (EscapeTransitions.isTransitioning()) return;
+      const id = obj.id;
+
+      // -- OFICINA --
+      if (id === 'gaveta') {
+        if (!state.get('gaveta')) {
+          state.set('gaveta', true);
+          state.set('ponteiroColetado', true);
+          inv.add('ponteiro', '🕐', 'Ponteiro dos minutos, solto');
+          msg('Na gaveta, um ponteiro de minutos soltou-se de algum relógio. Talvez pertença ao relógio de parede.');
+        } else { msg('A gaveta está vazia agora.'); }
+      } else if (id === 'ferramentas') {
+        if (!state.get('ferramentas')) {
+          state.set('ferramentas', true);
+          state.set('fragC', true);
+          inv.add('bilhete', '📝', 'Bilhete: "Ventura almoçava meia hora após o meio-dia"');
+          inv.add('fragC', '🧩', 'Fragmento de foto (borda direita)');
+          msg('Na caixa de ferramentas: um bilhete — "O velho Ventura almoçava sempre meia hora após o meio-dia, nem um minuto além" — e um pedaço rasgado de uma foto (a borda direita).');
+        } else { msg('Bilhete: "meia hora após o meio-dia". E você já pegou o fragmento da foto.'); }
+      } else if (id === 'relogio') {
+        if (state.get('relogioOk')) { msg('O relógio marca 12:30. O compartimento atrás dele está aberto.'); }
+        else if (state.get('ponteiroColetado')) { abrirRelogio(); }
+        else { msg('Falta o ponteiro dos minutos neste relógio. Sem ele, não dá para acertar a hora.'); }
+      } else if (id === 'xadrez') {
+        if (state.get('xadrezOk')) { msg('A partida terminou em mate. A gaveta secreta sob o tabuleiro está aberta.'); }
+        else { abrirXadrez(); }
+      } else if (id === 'jigsaw') {
+        abrirJigsaw();
+      } else if (id === 'porta') {
+        if (state.get('portaAberta')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('deposito'); UITabs.setActive('tabs', 'deposito'); msgAmb('deposito'); });
+        } else { abrirPorta(); }
+      }
+
+      // -- DEPÓSITO --
+      else if (id === 'esquema') {
+        if (!state.get('esquema')) {
+          state.set('esquema', true);
+          msg('O esquema mostra a planta do depósito: o engradado deve ser empurrado até o "X" marcado no canto — só assim a escotilha destrava.');
+        } else { msg('Esquema: empurrar o engradado até o "X" no canto libera a escotilha.'); }
+      } else if (id === 'blocos') {
+        if (state.get('sokobanOk')) { msg('O engradado já está sobre o "X". A escotilha destravou.'); }
+        else { abrirSokoban(); }
+      } else if (id === 'escotilha') {
+        if (state.get('sokobanOk')) { escapar(); }
+        else { msg('A escotilha está travada. Algo pesado precisa pressionar a placa marcada com "X".'); }
+      } else if (id === 'voltar') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => { state.setAmbiente('oficina'); UITabs.setActive('tabs', 'oficina'); msg('De volta à oficina.'); });
+      }
+
+      UIInventory.render('inventory', inv.getAll());
+    }
+
+    function checarFragmentos() {
+      // pista quando os 3 fragmentos estão coletados
+      if (state.get('fragA') && state.get('fragB') && state.get('fragC') && !state.get('jigsawOk')) {
+        msg('Você tem os 3 fragmentos da foto (A: relógio, B: xadrez, C: ferramentas). Monte-os na bancada.');
+      }
+    }
+
+    // ============ PUZZLE 1: RELÓGIO (manipulativo — ajustar até 12:30) ============
+    let relHora = 12, relMin = 0;
+    function abrirRelogio() {
+      relHora = 12; relMin = 0;
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:8px;">🕰️ Ajuste o relógio</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.82rem; margin-bottom:10px;">Gire os ponteiros até o horário do enigma.</p>
+        <svg id="relSvg" width="150" height="150" viewBox="0 0 150 150" style="display:block; margin:0 auto 10px;">
+          <circle cx="75" cy="75" r="70" fill="#0e0b07" stroke="#d9a441" stroke-width="3"/>
+          <line id="hHora" x1="75" y1="75" x2="75" y2="38" stroke="#e6d6b8" stroke-width="5" stroke-linecap="round"/>
+          <line id="hMin" x1="75" y1="75" x2="75" y2="20" stroke="#d9a441" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="75" cy="75" r="4" fill="#d9a441"/>
+        </svg>
+        <div id="relTime" style="font-size:1.4rem; color:${UITokens.get('colorAccent')}; margin-bottom:12px;">12:00</div>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          <button id="hMenos" style="padding:8px 12px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">◀ Hora</button>
+          <button id="hMais" style="padding:8px 12px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Hora ▶</button>
+          <button id="mMenos" style="padding:8px 12px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">◀ Min</button>
+          <button id="mMais" style="padding:8px 12px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Min ▶</button>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:14px;">
+          <button id="relConfirm" style="padding:8px 22px; background:#1c1710; border:1px solid #d9a441; color:#d9a441; font-family:monospace; cursor:pointer; border-radius:4px;">Confirmar</button>
+          <button id="relVoltar" style="padding:8px 20px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        const upd = () => {
+          const hh = ((relHora % 12) + (relMin / 60)) * 30;
+          const mm = relMin * 6;
+          document.getElementById('hHora').setAttribute('transform', 'rotate(' + hh + ' 75 75)');
+          document.getElementById('hMin').setAttribute('transform', 'rotate(' + mm + ' 75 75)');
+          const h12 = relHora === 0 ? 12 : relHora;
+          document.getElementById('relTime').textContent = h12 + ':' + String(relMin).padStart(2, '0');
+        };
+        document.getElementById('hMais').addEventListener('click', () => { relHora = (relHora % 12) + 1; upd(); });
+        document.getElementById('hMenos').addEventListener('click', () => { relHora = relHora <= 1 ? 12 : relHora - 1; upd(); });
+        document.getElementById('mMais').addEventListener('click', () => { relMin = (relMin + 5) % 60; upd(); });
+        document.getElementById('mMenos').addEventListener('click', () => { relMin = (relMin + 55) % 60; upd(); });
+        document.getElementById('relConfirm').addEventListener('click', () => {
+          if (relHora === 12 && relMin === 30) {
+            state.set('relogioOk', true); state.set('fragA', true);
+            UIPanel.hide('puzzle-panel');
+            inv.add('fragA', '🧩', 'Fragmento de foto (parte esquerda)');
+            UIInventory.render('inventory', inv.getAll());
+            msg('✅ Tique-taque! Aos 12:30, um compartimento range atrás do relógio e cospe um fragmento de foto (a parte esquerda).');
+            checarFragmentos();
+          } else {
+            msg('O relógio não reage. Reveja a pista sobre o horário de almoço de Ventura.');
+          }
+        });
+        document.getElementById('relVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você recua do relógio.'); });
+        upd();
+      }, 50);
+      msg('O relógio de parede tem os ponteiros livres. Gire-os até o horário certo.');
+    }
+
+    // ============ PUZZLE 2: XADREZ (manipulativo — clicar na casa do mate-em-1) ============
+    // Posição: Rei preto em g8, Dama branca em g1, coluna g aberta. Mate = Dama para g7.
+    function abrirXadrez() {
+      const files = ['a','b','c','d','e','f','g','h'];
+      const pieces = { g8: '♚', g1: '♕', b8: '♜', e7: '♟' };
+      let cells = '';
+      for (let r = 8; r >= 1; r--) {
+        for (let c = 0; c < 8; c++) {
+          const cid = files[c] + r;
+          const dark = (r + c) % 2 === 0;
+          const bg = dark ? '#3a2a18' : '#c9b48a';
+          const fg = pieces[cid] && ['♚','♜','♟'].includes(pieces[cid]) ? '#111' : '#f4ecd8';
+          cells += '<button class="xcell" data-c="' + cid + '" style="width:34px;height:34px;padding:0;border:none;background:' + bg + ';color:' + fg + ';font-size:20px;cursor:pointer;">' + (pieces[cid] || '') + '</button>';
+        }
+      }
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">♟️ Partida inacabada — as brancas jogam</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:10px;">Clique na casa que dá xeque-mate em um lance.</p>
+        <div style="display:grid; grid-template-columns:repeat(8,34px); gap:0; justify-content:center; margin:0 auto 12px; width:max-content; border:3px solid #4a3a22;">${cells}</div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button id="xVoltar" style="padding:8px 20px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.querySelectorAll('.xcell').forEach(b => b.addEventListener('click', () => {
+          if (b.dataset.c === 'g7') {
+            state.set('xadrezOk', true); state.set('fragB', true);
+            UIPanel.hide('puzzle-panel');
+            inv.add('fragB', '🧩', 'Fragmento de foto (parte central)');
+            UIInventory.render('inventory', inv.getAll());
+            msg('✅ Dama em g7 — xeque-mate! Um clique ecoa sob o tabuleiro e a gaveta secreta se abre: mais um fragmento da foto (parte central).');
+          } else {
+            msg('Esse lance não encerra a partida. Lembre: a Dama encurrala o Rei na casa colada a ele, na mesma coluna.');
+          }
+        }));
+        document.getElementById('xVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você recua do tabuleiro.'); });
+      }, 50);
+      msg('Uma partida parada a um lance do fim. A Dama branca (coluna g) pode terminar tudo. Um livro de aberturas na bancada anota: "a Dama termina o que os peões começaram — colada ao Rei."');
+    }
+
+    // ============ PUZZLE 3: JIGSAW (manipulativo — montar a foto) ============
+    function abrirJigsaw() {
+      if (state.get('jigsawOk')) { msg('A foto já está montada. O código revelado é 7-3-0.'); return; }
+      if (!(state.get('fragA') && state.get('fragB') && state.get('fragC'))) {
+        msg('Faltam fragmentos da foto. Encontre os três (relógio, xadrez, ferramentas) antes de montar.');
+        return;
+      }
+      const opt = (v, t) => '<option value="' + v + '">' + t + '</option>';
+      const sel = (idSlot) => '<select id="' + idSlot + '" style="background:#15110b;border:1px solid #4a3a22;color:#d9a441;padding:6px;font-family:monospace;border-radius:4px;">' +
+        opt('', '—') + opt('A', 'Frag. A') + opt('B', 'Frag. B') + opt('C', 'Frag. C') + '</select>';
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">🧩 Monte a foto rasgada</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:12px;">Coloque cada fragmento na sua posição. Cada descrição diz onde ele fica.</p>
+        <div style="display:flex; gap:14px; justify-content:center; align-items:flex-end; margin-bottom:14px;">
+          <div><div style="color:#8f7a58; font-size:0.75rem; margin-bottom:4px;">Esquerda</div>${sel('slotL')}</div>
+          <div><div style="color:#8f7a58; font-size:0.75rem; margin-bottom:4px;">Centro</div>${sel('slotC')}</div>
+          <div><div style="color:#8f7a58; font-size:0.75rem; margin-bottom:4px;">Direita</div>${sel('slotR')}</div>
+        </div>
+        <div id="jigMsg" style="color:#4fc7a8; min-height:20px; margin-bottom:10px;"></div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button id="jigOk" style="padding:8px 22px; background:#1c1710; border:1px solid #d9a441; color:#d9a441; font-family:monospace; cursor:pointer; border-radius:4px;">Montar</button>
+          <button id="jigVoltar" style="padding:8px 20px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('jigOk').addEventListener('click', () => {
+          const l = document.getElementById('slotL').value;
+          const c = document.getElementById('slotC').value;
+          const r = document.getElementById('slotR').value;
+          if (!l || !c || !r) { document.getElementById('jigMsg').textContent = 'Preencha as três posições.'; return; }
+          if (l === 'A' && c === 'B' && r === 'C') {
+            state.set('jigsawOk', true);
+            UIPanel.hide('puzzle-panel');
+            inv.add('codigoFoto', '🔢', 'Foto montada: número 7-3-0 rabiscado atrás');
+            UIInventory.render('inventory', inv.getAll());
+            msg('✅ A foto se completa: é o Sr. Ventura diante da porta do depósito. Atrás dela, a lápis: "7 3 0". É o código da porta!');
+          } else {
+            document.getElementById('jigMsg').textContent = 'As bordas não se alinham assim. Releia onde cada fragmento pertence.';
+          }
+        });
+        document.getElementById('jigVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você deixa a montagem de lado.'); });
+      }, 50);
+      msg('Na bancada, três slots para os fragmentos: esquerda, centro e direita.');
+    }
+
+    // ============ PORTA BLINDADA (código 730 revelado pela foto) ============
+    function abrirPorta() {
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🔒 Porta do Depósito — 3 dígitos</p>
+        <input type="text" id="portaInput" maxlength="3" placeholder="_ _ _"
+          style="background:#0e0b07; border:1px solid #4a3a22; color:#d9a441; font-family:'Courier New'; font-size:1.5rem; padding:10px; width:110px; text-align:center; border-radius:4px;">
+        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+          <button id="portaOk" style="padding:8px 22px; background:#1c1710; border:1px solid #d9a441; color:#d9a441; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Abrir</button>
+          <button id="portaVoltar" style="padding:8px 20px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        document.getElementById('portaInput').focus();
+        const tenta = () => {
+          const el = document.getElementById('portaInput');
+          if (el.value.trim() === '730') {
+            state.set('portaAberta', true); UITabs.unlock('tabs', 'deposito'); UIPanel.hide('puzzle-panel');
+            msg('✅ A porta blindada destrava com um estalo pesado. O depósito está aberto.');
+          } else { msg('❌ Código incorreto. A foto montada revela o número certo.'); el.value = ''; el.focus(); }
+        };
+        document.getElementById('portaOk').addEventListener('click', tenta);
+        document.getElementById('portaVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você recua da porta.'); });
+        document.getElementById('portaInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tenta(); });
+      }, 50);
+      msg('A porta blindada pede um código de 3 dígitos.');
+    }
+
+    // ============ PUZZLE 4: SOKOBAN (manipulativo — empurrar o engradado até o X) ============
+    const SOKO_ROWS = 3, SOKO_COLS = 5;
+    const SOKO_WALLS = ['1,1', '1,3'];
+    const SOKO_TARGET = { r: 2, c: 4 };
+    let sokoCrate = { r: 0, c: 0 };
+    function sokoRender() {
+      let g = '<div style="display:grid; grid-template-columns:repeat(' + SOKO_COLS + ',40px); gap:3px; justify-content:center; margin:0 auto 12px; width:max-content;">';
+      for (let r = 0; r < SOKO_ROWS; r++) for (let c = 0; c < SOKO_COLS; c++) {
+        const isWall = SOKO_WALLS.includes(r + ',' + c);
+        const isTarget = SOKO_TARGET.r === r && SOKO_TARGET.c === c;
+        const isCrate = sokoCrate.r === r && sokoCrate.c === c;
+        let bg = '#15110b', content = '';
+        if (isWall) { bg = '#3a2a18'; content = '█'; }
+        else if (isTarget) { bg = '#221108'; content = '<span style="color:#d4643a;font-weight:bold;">✕</span>'; }
+        if (isCrate) { bg = isTarget ? '#1a3a30' : '#5a4126'; content = '<span style="color:#e6d6b8;">▩</span>'; }
+        g += '<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:' + bg + ';border:1px solid #4a3a22;font-size:18px;">' + content + '</div>';
+      }
+      g += '</div>';
+      return g;
+    }
+    function abrirSokoban() {
+      sokoCrate = { r: 0, c: 0 };
+      const btn = (id, t) => '<button id="' + id + '" style="padding:10px 16px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; font-size:1.1rem; cursor:pointer; border-radius:4px;">' + t + '</button>';
+      const html = `
+        <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">📦 Empurre o engradado</p>
+        <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:12px;">Leve o engradado (▩) até a marca (✕).</p>
+        <div id="sokoGrid">${sokoRender()}</div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+          ${btn('sUp', '▲')}
+          <div style="display:flex; gap:6px;">${btn('sLeft', '◀')}${btn('sDown', '▼')}${btn('sRight', '▶')}</div>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:14px;">
+          <button id="sReset" style="padding:6px 16px; background:#1c1710; border:1px solid #d4643a; color:#d4643a; font-family:monospace; cursor:pointer; border-radius:4px;">Reiniciar</button>
+          <button id="sVoltar" style="padding:6px 16px; background:#1c1710; border:1px solid #4a3a22; color:#e6d6b8; font-family:monospace; cursor:pointer; border-radius:4px;">Voltar</button>
+        </div>`;
+      UIPanel.setContent('puzzle-panel', html); UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        const mover = (dr, dc) => {
+          const nr = sokoCrate.r + dr, nc = sokoCrate.c + dc;
+          if (nr < 0 || nr >= SOKO_ROWS || nc < 0 || nc >= SOKO_COLS) return;
+          if (SOKO_WALLS.includes(nr + ',' + nc)) return;
+          sokoCrate = { r: nr, c: nc };
+          document.getElementById('sokoGrid').innerHTML = sokoRender();
+          if (sokoCrate.r === SOKO_TARGET.r && sokoCrate.c === SOKO_TARGET.c) {
+            state.set('sokobanOk', true);
+            setTimeout(() => {
+              UIPanel.hide('puzzle-panel');
+              msg('✅ O engradado desliza sobre a marca "✕" com um baque. A placa de pressão afunda e a escotilha de saída destrava!');
+            }, 400);
+          }
+        };
+        document.getElementById('sUp').addEventListener('click', () => mover(-1, 0));
+        document.getElementById('sDown').addEventListener('click', () => mover(1, 0));
+        document.getElementById('sLeft').addEventListener('click', () => mover(0, -1));
+        document.getElementById('sRight').addEventListener('click', () => mover(0, 1));
+        document.getElementById('sReset').addEventListener('click', () => { sokoCrate = { r: 0, c: 0 }; document.getElementById('sokoGrid').innerHTML = sokoRender(); });
+        document.getElementById('sVoltar').addEventListener('click', () => { UIPanel.hide('puzzle-panel'); msg('Você deixa os engradados.'); });
+      }, 50);
+      msg('Um engradado pesado sobre trilhos de madeira. Empurre-o na direção certa até a marca no piso.');
+    }
+
+    // ============ ESCAPE ============
+    function escapar() {
+      timer.stop();
+      const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+      if (EscapeAPI.isLoggedIn()) {
+        EscapeAPI.registrarResultado('Sala 15 — A Oficina do Relojoeiro', 'win', tempoSeg);
+      }
+      UISuccessOverlay.show('success-overlay', {
+        title: '🕰️ VOCÊ DECIFROU O RELOJOEIRO',
+        subtitle: 'A escotilha se abre para o beco atrás da oficina. No banco de trabalho, o Sr. Ventura deixou um bilhete: "Quem entende de tempo, sempre encontra a saída."',
+        time: timer.format(),
+        links: [{ text: '← Voltar ao Lobby', href: '../index.html' }]
+      });
+    }
+
+    // ============ INPUT ============
+    input.onClick((x, y) => {
+      if (EscapeTransitions.isTransitioning()) return;
+      const obj = input.hitTest(x, y, getObjetos());
+      if (obj) interagir(obj);
+    });
+
+    // ============ RENDER ============
+    game.onRender((ctx, dt, size) => {
+      const amb = state.getAmbiente();
+      if (amb === 'oficina') renderOficina(ctx, state);
+      else renderDeposito(ctx, state);
+
+      const hovered = input.getHoveredObject(getObjetos());
+      for (const obj of getObjetos()) {
+        if (hovered && hovered.id === obj.id) {
+          ctx.save();
+          ctx.strokeStyle = UITokens.get('glowColor');
+          ctx.lineWidth = 2;
+          ctx.shadowColor = UITokens.get('glowColor');
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+          ctx.restore();
+        }
+      }
+      motes.update(dt); motes.render(ctx);
+      EscapeTransitions.render(ctx, size.width, size.height);
+    });
+
+    game.start();
+    UIInventory.render('inventory', inv.getAll());
+  </script>
+</body>
+</html>
