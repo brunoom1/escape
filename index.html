@@ -192,6 +192,34 @@
       align-items: center;
       justify-content: center;
       font-size: 4rem;
+      position: relative;
+    }
+
+    /* Played badge */
+    .game-card--played {
+      border-color: #00ff88;
+    }
+
+    .game-card__played-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 20, 12, 0.9);
+      border: 1px solid #00ff88;
+      color: #00ff88;
+      font-size: 0.75rem;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 20px;
+      box-shadow: 0 2px 12px rgba(0, 255, 136, 0.25);
+    }
+
+    .game-card__played-badge .badge-time {
+      color: #b6ffd9;
+      font-weight: normal;
     }
 
     .game-card__body {
@@ -650,10 +678,56 @@
     // Listener de mudanças de auth
     EscapeAPI.onAuthChange(function() {
       updateAuthUI();
+      marcarJogosJogados();
     });
 
     // Inicializar UI de auth
     updateAuthUI();
+    marcarJogosJogados();
+
+    // ============ EMBLEMA "JOGADO" NOS CARDS ============
+    function limparEmblemas() {
+      document.querySelectorAll('.game-card__played-badge').forEach(el => el.remove());
+      document.querySelectorAll('.game-card--played').forEach(el => el.classList.remove('game-card--played'));
+    }
+
+    async function marcarJogosJogados() {
+      limparEmblemas();
+      if (!EscapeAPI.isLoggedIn()) return;
+
+      const result = await EscapeAPI.getResultados();
+      const resultados = (result && (result.results || result.data)) || [];
+      if (!resultados.length) return;
+
+      // Melhor tempo (menor) por jogo, considerando apenas vitórias
+      const melhorPorJogo = {};
+      for (const r of resultados) {
+        if (r.result && r.result !== 'win') continue;
+        const nome = r.game_name;
+        const t = r.time_seconds;
+        if (typeof t !== 'number') continue;
+        if (!(nome in melhorPorJogo) || t < melhorPorJogo[nome]) {
+          melhorPorJogo[nome] = t;
+        }
+      }
+
+      // Aplicar emblema aos cards correspondentes
+      document.querySelectorAll('#section-jogos .game-card').forEach(card => {
+        const titleEl = card.querySelector('.game-card__title');
+        if (!titleEl) return;
+        const nome = titleEl.textContent.trim();
+        if (nome in melhorPorJogo) {
+          card.classList.add('game-card--played');
+          const img = card.querySelector('.game-card__image');
+          if (img) {
+            const badge = document.createElement('div');
+            badge.className = 'game-card__played-badge';
+            badge.innerHTML = '✓ Jogado <span class="badge-time">' + formatTime(melhorPorJogo[nome]) + '</span>';
+            img.appendChild(badge);
+          }
+        }
+      });
+    }
 
     // ============ RANKING ============
     function formatTime(totalSeconds) {
