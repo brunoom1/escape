@@ -48,6 +48,7 @@
   <div id="inventory"></div>
 
   <!-- Lib -->
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -119,6 +120,9 @@
 
     function msg(text) { UIMessageBox.show('message', text); }
     msg('Um submarino militar afundado. O casco geme sob a pressão. Água infiltra pelas juntas. Precisa estabilizar a pressão e escapar antes que a estrutura ceda.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     // ============ OBJETOS ============
@@ -266,6 +270,10 @@
     // ============ ESCAPE ============
     function escapar() {
       timer.stop();
+      const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+      if (EscapeAPI.isLoggedIn()) {
+        EscapeAPI.registrarResultado('Sala 5 — O Submarino Afundado', 'win', tempoSeg);
+      }
       UISuccessOverlay.show('success-overlay', {
         title: '🚀 VOCÊ ESCAPOU!',
         subtitle: 'A pressão foi estabilizada. A escotilha de escape abriu e a cápsula de resgate foi ativada. Você sobe em direção à superfície.',

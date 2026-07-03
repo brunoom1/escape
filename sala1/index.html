@@ -48,6 +48,7 @@
   <div id="inventory"></div>
 
   <!-- Lib -->
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -116,6 +117,9 @@
 
     function msg(text) { UIMessageBox.show('message', text); }
     msg('O escritório do Detetive Moreira. Poeira cobre tudo. O ar está parado há semanas. A porta trancou atrás de você.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     // ============ OBJETOS ============
@@ -326,6 +330,10 @@
     // ============ ESCAPE ============
     function escapar() {
       timer.stop();
+      const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+      if (EscapeAPI.isLoggedIn()) {
+        EscapeAPI.registrarResultado('Sala 1 — O Escritório do Detetive', 'win', tempoSeg);
+      }
       UISuccessOverlay.show('success-overlay', {
         title: '🎉 VOCÊ ESCAPOU!',
         subtitle: 'As provas da fraude Meridian estão seguras. O caso do Detetive Moreira vai ser reaberto.',

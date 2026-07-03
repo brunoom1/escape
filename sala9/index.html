@@ -24,6 +24,7 @@
   <div id="message"></div>
   <div id="inventory"></div>
 
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -85,6 +86,9 @@
     const staticParticles = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(198,40,40,0.08)', count: 20, speedX: [-3,3], speedY: [-2,2], size: [1,2], life: [3,8] });
     function msg(t) { UIMessageBox.show('message', t); }
     msg('Bunker soviético, 1962. Você é um espião preso. Um túnel de fuga existe, mas precisa de uma transmissão codificada para abrir a porta pneumática. Encontre a cifra, a palavra e a frequência.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     const objetosEscritorio = [
@@ -279,6 +283,10 @@
           if (!freq || !code) { msg('Preencha frequência e código.'); return; }
           if (freq === CORRECT_FREQ && code === CORRECT_WORD) {
             state.set('puzzleFinal', true); UIPanel.hide('puzzle-panel'); timer.stop();
+            const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+            if (EscapeAPI.isLoggedIn()) {
+              EscapeAPI.registrarResultado('Sala 9 — O Bunker', 'win', tempoSeg);
+            }
             UISuccessOverlay.show('success-overlay', {
               title: '🚪 TÚNEL ABERTO!',
               subtitle: 'Transmissão confirmada na frequência 103.7. A porta pneumática se abre com um sibilo. Você rasteja pelo túnel e emerge na floresta gelada da Sibéria. Livre.',

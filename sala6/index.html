@@ -38,6 +38,7 @@
   <div id="message"></div>
   <div id="inventory"></div>
 
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -130,6 +131,9 @@
     function msg(t) { UIMessageBox.show('message', t); }
 
     msg('O alarme disparou. As portas selaram automaticamente. Você, segurança noturno, está preso dentro do museu. Lasers vermelhos bloqueiam as passagens. Encontre um jeito de desativar o sistema e escapar.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     // ═══════════════ OBJETOS POR AMBIENTE ═══════════════
@@ -484,6 +488,10 @@
     // ═══════════════ ESCAPE ═══════════════
     function escapar() {
       timer.stop();
+      const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+      if (EscapeAPI.isLoggedIn()) {
+        EscapeAPI.registrarResultado('Sala 6 — O Museu à Noite', 'win', tempoSeg);
+      }
       UISuccessOverlay.show('success-overlay', {
         title: '\u{1F3DB}\uFE0F MUSEU DESBLOQUEADO!',
         subtitle: 'O override é aceito. Os servos mecânicos das portas de emergência clicam em sequência. O ar frio da noite invade o museu silencioso. Você está livre.',

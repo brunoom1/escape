@@ -24,6 +24,7 @@
   <div id="message"></div>
   <div id="inventory"></div>
 
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -125,6 +126,9 @@
       else msg('A locomotiva. Caldeira, alavancas, manômetros. Nenhum maquinista à vista. O trem acelera.');
     }
     msg('Orient Express, 1934. Você acorda no vagão restaurante. O trem acelera sem controle. Não há maquinista. Você precisa chegar à locomotiva e frear.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     // OBJETOS
@@ -328,6 +332,10 @@
           const v3 = parseInt(document.getElementById('lev3').value) || 0;
           if (v1 === 7 && v2 === 15 && v3 === 28) {
             UIPanel.hide('puzzle-panel'); timer.stop();
+            const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+            if (EscapeAPI.isLoggedIn()) {
+              EscapeAPI.registrarResultado('Sala 7 — O Orient Express', 'win', tempoSeg);
+            }
             UISuccessOverlay.show('success-overlay', {
               title: '🚂 O TREM FREIA!',
               subtitle: 'As alavancas travam na posição. O chiado dos freios ecoa pelos trilhos. O Orient Express desacelera suavemente antes da curva. Você salvou todos a bordo.',

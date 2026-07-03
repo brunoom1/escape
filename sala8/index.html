@@ -24,6 +24,7 @@
   <div id="message"></div>
   <div id="inventory"></div>
 
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -83,6 +84,9 @@
     const dust = EscapeParticles.create({ x: 0, y: 0, width: 900, height: 600, color: 'rgba(212,168,67,0.12)', count: 25, speedX: [-2,2], speedY: [-1,1], size: [1,2], life: [5,12] });
     function msg(t) { UIMessageBox.show('message', t); }
     msg('A Pirâmide de Khufu. Milênios de silêncio. Hieróglifos cobrem cada superfície. Decifre os símbolos antigos para alcançar a câmara do faraó.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     const objetosAntecamara = [
@@ -276,6 +280,10 @@
           if (seq.includes('')) { msg('Preencha todos os 5 símbolos.'); return; }
           if (seq[0]==='sol' && seq[1]==='agua' && seq[2]==='vida' && seq[3]==='terra' && seq[4]==='fogo') {
             state.set('puzzleFinal', true); UIPanel.hide('puzzle-panel'); timer.stop();
+            const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+            if (EscapeAPI.isLoggedIn()) {
+              EscapeAPI.registrarResultado('Sala 8 — A Pirâmide de Khufu', 'win', tempoSeg);
+            }
             UISuccessOverlay.show('success-overlay', {
               title: '𓂀 A PIRÂMIDE SE ABRE!',
               subtitle: 'Sol, Água, Vida, Terra, Fogo — o mito da criação completo. A parede desliza, revelando o deserto sob as estrelas.',

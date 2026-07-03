@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Escape Rooms — Encontre a Saída</title>
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -38,10 +40,69 @@
       50% { transform: translateY(-30px) translateX(10px); opacity: 0.5; }
     }
 
+    /* Top bar (auth) */
+    .top-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 12px 24px;
+      position: relative;
+      z-index: 10;
+      gap: 12px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ccc;
+      font-size: 0.85rem;
+    }
+
+    .user-info img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid #ffcc00;
+    }
+
+    .user-info span {
+      color: #ffcc00;
+      font-weight: bold;
+    }
+
+    .btn-logout {
+      background: none;
+      border: 1px solid #555;
+      color: #888;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border-color 0.3s, color 0.3s;
+    }
+
+    .btn-logout:hover {
+      border-color: #ffcc00;
+      color: #ffcc00;
+    }
+
+    .login-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .login-hint {
+      color: #666;
+      font-size: 0.75rem;
+    }
+
     /* Header */
     .header {
       text-align: center;
-      padding: 60px 20px 40px;
+      padding: 40px 20px 30px;
       position: relative;
       z-index: 1;
     }
@@ -60,6 +121,35 @@
       max-width: 500px;
       margin: 0 auto;
       line-height: 1.6;
+    }
+
+    /* Section nav */
+    .section-nav {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 24px 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-nav button {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #888;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.3s, color 0.3s, background 0.3s;
+    }
+
+    .section-nav button.active,
+    .section-nav button:hover {
+      border-color: #ffcc00;
+      color: #ffcc00;
+      background: #1a1a10;
     }
 
     /* Games grid */
@@ -158,6 +248,147 @@
       display: none;
     }
 
+    /* Ranking section */
+    .ranking-section {
+      display: none;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px 24px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .ranking-section.active {
+      display: block;
+    }
+
+    .games-grid.active {
+      display: grid;
+    }
+
+    .games-grid:not(.active) {
+      display: none;
+    }
+
+    .ranking-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .ranking-header h2 {
+      color: #ffcc00;
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+    }
+
+    .ranking-header p {
+      color: #666;
+      font-size: 0.85rem;
+    }
+
+    .ranking-filter {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      color: #888;
+      font-size: 0.85rem;
+    }
+
+    .ranking-filter select {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      max-width: 320px;
+    }
+
+    .ranking-filter select:hover,
+    .ranking-filter select:focus {
+      border-color: #ffcc00;
+      outline: none;
+    }
+
+    .ranking-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .ranking-score {
+      color: #ffcc00;
+      font-weight: bold;
+    }
+
+    .ranking-table th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid #333;
+      color: #ffcc00;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .ranking-table td {
+      padding: 12px;
+      border-bottom: 1px solid #222;
+      font-size: 0.9rem;
+    }
+
+    .ranking-table tr:hover td {
+      background: #1a1a10;
+    }
+
+    .ranking-pos {
+      color: #ffcc00;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .ranking-pos--1 { color: #ffd700; }
+    .ranking-pos--2 { color: #c0c0c0; }
+    .ranking-pos--3 { color: #cd7f32; }
+
+    .ranking-player {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ranking-player img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
+
+    .ranking-player-name {
+      color: #e0e0e0;
+    }
+
+    .ranking-stat {
+      color: #aaa;
+    }
+
+    .ranking-time {
+      color: #00ff88;
+      font-weight: bold;
+    }
+
+    .ranking-empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+
+    .ranking-empty p {
+      margin-bottom: 8px;
+    }
+
     /* Footer */
     .footer {
       text-align: center;
@@ -172,18 +403,49 @@
     @media (max-width: 600px) {
       .header h1 { font-size: 1.8rem; }
       .games-grid { grid-template-columns: 1fr; padding: 16px; }
+      .top-bar { padding: 8px 12px; }
+      .ranking-table { font-size: 0.8rem; }
+      .ranking-table th, .ranking-table td { padding: 8px 6px; }
     }
   </style>
 </head>
 <body>
   <div class="bg-particles" id="particles"></div>
 
+  <!-- Top bar: Login / User info -->
+  <div class="top-bar">
+    <div id="auth-area">
+      <!-- Estado deslogado: botão Google -->
+      <div id="auth-logged-out" class="login-area">
+        <span class="login-hint">Entre para participar do ranking</span>
+        <div id="g_id_onload"
+             data-client_id="204404731348-njob40jdrqb3j38d0521bgqt8mvaq6uj.apps.googleusercontent.com"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false"></div>
+        <div class="g_id_signin" data-type="standard" data-size="medium" data-theme="filled_black" data-text="signin_with"></div>
+      </div>
+      <!-- Estado logado: avatar + nome + logout -->
+      <div id="auth-logged-in" class="user-info" style="display:none;">
+        <img id="user-avatar" src="" alt="Avatar">
+        <span id="user-name"></span>
+        <button class="btn-logout" onclick="doLogout()">Sair</button>
+      </div>
+    </div>
+  </div>
+
   <header class="header">
     <h1>🔒 ESCAPE ROOMS</h1>
     <p>Cada sala é um desafio único. Explore, deduza e encontre a saída antes que seja tarde.</p>
   </header>
 
-  <main class="games-grid">
+  <!-- Section navigation -->
+  <nav class="section-nav">
+    <button id="nav-jogos" class="active" onclick="showSection('jogos')">🎮 Jogos</button>
+    <button id="nav-ranking" onclick="showSection('ranking')">🏆 Ranking</button>
+  </nav>
+
+  <!-- Games section -->
+  <main class="games-grid active" id="section-jogos">
     <a href="sala1/index.html" class="game-card">
       <div class="game-card__image">🕵️</div>
       <div class="game-card__body">
@@ -293,12 +555,43 @@
     </a>
   </main>
 
+  <!-- Ranking section -->
+  <section class="ranking-section" id="section-ranking">
+    <div class="ranking-header">
+      <h2>🏆 Ranking Geral</h2>
+      <p>Score = jogos² / tempo total. Mais jogos e menos tempo elevam sua pontuação.</p>
+    </div>
+    <div class="ranking-filter">
+      <label for="ranking-game-filter">Filtrar por jogo:</label>
+      <select id="ranking-game-filter" onchange="carregarRanking()">
+        <option value="">Todos os jogos (geral)</option>
+        <option value="Sala 1 — O Escritório do Detetive">Sala 1 — O Escritório do Detetive</option>
+        <option value="Sala 2 — Protocolo Omega">Sala 2 — Protocolo Omega</option>
+        <option value="Sala 3 — A Mansão dos Blackwood">Sala 3 — A Mansão dos Blackwood</option>
+        <option value="Sala 4 — Estação Espacial">Sala 4 — Estação Espacial</option>
+        <option value="Sala 5 — O Submarino Afundado">Sala 5 — O Submarino Afundado</option>
+        <option value="Sala 6 — O Museu à Noite">Sala 6 — O Museu à Noite</option>
+        <option value="Sala 7 — O Orient Express">Sala 7 — O Orient Express</option>
+        <option value="Sala 8 — A Pirâmide de Khufu">Sala 8 — A Pirâmide de Khufu</option>
+        <option value="Sala 9 — O Bunker">Sala 9 — O Bunker</option>
+      </select>
+    </div>
+    <div id="ranking-content">
+      <div class="ranking-empty">
+        <p>🔄 Carregando ranking...</p>
+      </div>
+    </div>
+  </section>
+
   <footer class="footer">
     Escape Rooms — Desafie sua mente
   </footer>
 
+  <!-- API Module -->
+  <script src="lib/api.js"></script>
+
   <script>
-    // Criar partículas de fundo
+    // ============ PARTÍCULAS ============
     const particlesContainer = document.getElementById('particles');
     for (let i = 0; i < 40; i++) {
       const span = document.createElement('span');
@@ -307,6 +600,118 @@
       span.style.animationDelay = (Math.random() * 8) + 's';
       span.style.animationDuration = (6 + Math.random() * 6) + 's';
       particlesContainer.appendChild(span);
+    }
+
+    // ============ SEÇÕES ============
+    function showSection(section) {
+      const jogos = document.getElementById('section-jogos');
+      const ranking = document.getElementById('section-ranking');
+      const navJogos = document.getElementById('nav-jogos');
+      const navRanking = document.getElementById('nav-ranking');
+
+      if (section === 'jogos') {
+        jogos.classList.add('active');
+        ranking.classList.remove('active');
+        navJogos.classList.add('active');
+        navRanking.classList.remove('active');
+      } else {
+        jogos.classList.remove('active');
+        ranking.classList.add('active');
+        navJogos.classList.remove('active');
+        navRanking.classList.add('active');
+        carregarRanking();
+      }
+    }
+
+    // ============ AUTH UI ============
+    function updateAuthUI() {
+      const loggedOut = document.getElementById('auth-logged-out');
+      const loggedIn = document.getElementById('auth-logged-in');
+      const avatar = document.getElementById('user-avatar');
+      const name = document.getElementById('user-name');
+
+      if (EscapeAPI.isLoggedIn()) {
+        const user = EscapeAPI.getUser();
+        loggedOut.style.display = 'none';
+        loggedIn.style.display = 'flex';
+        avatar.src = user.picture || '';
+        name.textContent = user.name || user.email;
+      } else {
+        loggedOut.style.display = 'flex';
+        loggedIn.style.display = 'none';
+      }
+    }
+
+    function doLogout() {
+      EscapeAPI.logout();
+      updateAuthUI();
+    }
+
+    // Listener de mudanças de auth
+    EscapeAPI.onAuthChange(function() {
+      updateAuthUI();
+    });
+
+    // Inicializar UI de auth
+    updateAuthUI();
+
+    // ============ RANKING ============
+    function formatTime(totalSeconds) {
+      const min = Math.floor(totalSeconds / 60);
+      const sec = totalSeconds % 60;
+      return min + 'm ' + sec + 's';
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function carregarRanking() {
+      const container = document.getElementById('ranking-content');
+      container.innerHTML = '<div class="ranking-empty"><p>🔄 Carregando ranking...</p></div>';
+
+      const gameFilter = document.getElementById('ranking-game-filter').value;
+      const result = await EscapeAPI.getRanking(gameFilter);
+
+      if (!result.success && result.error) {
+        container.innerHTML = '<div class="ranking-empty"><p>⚠️ Não foi possível carregar o ranking</p><p style="font-size:0.75rem; color:#555;">' + escapeHtml(result.error) + '</p></div>';
+        return;
+      }
+
+      const players = result.ranking || result.data || [];
+
+      if (!players.length) {
+        container.innerHTML = '<div class="ranking-empty"><p>🏜️ Nenhum jogador no ranking ainda</p><p style="font-size:0.75rem; color:#555;">Complete uma sala logado para aparecer aqui!</p></div>';
+        return;
+      }
+
+      let html = '<table class="ranking-table"><thead><tr>';
+      html += '<th>#</th><th>Jogador</th><th>Jogos</th><th>Tempo Total</th><th>Score</th>';
+      html += '</tr></thead><tbody>';
+
+      for (let i = 0; i < players.length; i++) {
+        const p = players[i];
+        const pos = p.position || (i + 1);
+        const posClass = pos <= 3 ? ' ranking-pos--' + pos : '';
+        const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : pos;
+        const nome = p.user_name || p.user_email || 'Jogador';
+        const score = typeof p.score === 'number' ? p.score.toFixed(4) : (p.score || '—');
+        html += '<tr>';
+        html += '<td><span class="ranking-pos' + posClass + '">' + medal + '</span></td>';
+        html += '<td><div class="ranking-player"><span class="ranking-player-name">' + escapeHtml(nome) + '</span></div></td>';
+        html += '<td class="ranking-stat">' + (p.total_games || 0) + '</td>';
+        html += '<td class="ranking-time">' + formatTime(p.total_time_seconds || 0) + '</td>';
+        html += '<td class="ranking-score">' + score + '</td>';
+        html += '</tr>';
+      }
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
     }
   </script>
 </body>

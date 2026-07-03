@@ -208,3 +208,147 @@ projeto/
 - [ ] Hover effect funciona no novo card
 - [ ] Ordem/disposição dos cards faz sentido
 - [ ] Site carrega em < 1s com nova imagem
+
+---
+
+## Integração com API REST e Google Auth
+
+### Visão Geral
+
+O site deve permitir que o usuário faça login com sua conta Google e que possamos registrar o tempo de resolução de cada jogo. Também teremos um **ranking geral** dos jogadores, avaliado por:
+- Menor tempo total nos jogos
+- Maior quantidade de jogos completados
+
+### Configuração de Autenticação (Google Identity Services)
+
+O site utiliza o **Google Identity Services** para autenticação. O fluxo é:
+
+1. Usuário clica em "Entrar com Google"
+2. Google retorna um ID Token
+3. Enviamos o token ao nosso backend (Cloudflare Worker)
+4. Backend valida e retorna um JWT próprio da aplicação
+5. JWT é salvo no `localStorage` e usado em requisições autenticadas
+
+### Script de Integração
+
+O seguinte código deve ser inserido no `index.html` (ou em um módulo JS separado carregado pelo site):
+
+```html
+<!-- Carregar Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Botão de login do Google -->
+<div id="g_id_onload"
+     data-client_id="SEU_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+     data-callback="handleCredentialResponse"></div>
+<div class="g_id_signin" data-type="standard"></div>
+```
+
+```javascript
+// Callback do login Google
+async function handleCredentialResponse(response) {
+  // response.credential é o ID Token do Google
+  const resp = await fetch("https://seu-worker.workers.dev/auth/google", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id_token: response.credential })
+  });
+  const data = await resp.json();
+  if (data.token) {
+    localStorage.setItem("app_token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+    alert("Logado como " + data.user.email);
+  }
+}
+
+// Registrar resultado de um jogo
+async function registrarResultado(jogo, resultado, tempoSegundos) {
+  const token = localStorage.getItem("app_token");
+  const resp = await fetch("https://seu-worker.workers.dev/games/result", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify({
+      game_name: jogo,
+      result: resultado,
+      time_seconds: tempoSegundos
+    })
+  });
+  return await resp.json();
+}
+
+// Exemplo de uso ao completar um jogo:
+// registrarResultado("Sala 4 — Estação Espacial", "win", 180);
+```
+
+### Endpoints da API
+
+| Método | Rota | Autenticação | Função |
+|--------|------|--------------|--------|
+| `POST` | `/auth/google` | Google ID Token | Valida token Google e retorna JWT próprio |
+| `POST` | `/games/result` | JWT (Bearer) | Registra jogo, resultado e tempo |
+| `GET` | `/games/results` | JWT (Bearer) | Lista resultados do usuário |
+
+### Base URL da API
+
+```
+https://seu-worker.workers.dev
+```
+
+> **Nota:** Substituir `SEU_GOOGLE_CLIENT_ID` e `seu-worker.workers.dev` pelos valores reais quando o backend estiver configurado.
+
+### Ranking Geral
+
+O site deve exibir um **ranking/leaderboard** acessível a todos os usuários (logados ou não). Critérios de classificação:
+
+1. **Menor tempo acumulado** — soma dos tempos de resolução de todos os jogos completados
+2. **Maior quantidade de jogos completados** — desempate por número de salas finalizadas
+
+O ranking pode ser uma seção no site principal ou uma página separada, exibindo:
+- Posição (#1, #2, #3…)
+- Avatar/nome do jogador (obtido via Google profile)
+- Total de jogos completados
+- Tempo total acumulado
+- Melhor tempo individual (opcional)
+
+### Fluxo de Registro de Resultado nos Jogos
+
+Cada sala de escape, ao ser completada, deve chamar a função `registrarResultado()`:
+
+```javascript
+// Dentro do render.js ou lógica de conclusão de cada sala:
+// Quando o jogador resolve o puzzle final:
+registrarResultado("Nome da Sala", "win", tempoEmSegundos);
+```
+
+O tempo deve ser medido desde o início do jogo até a resolução (já existe `lib/timer.js` no projeto para isso).
+
+### Requisitos de Integração
+
+| ID | Requisito | Prioridade |
+|----|-----------|------------|
+| API-01 | Login com Google via Google Identity Services | Alta |
+| API-02 | Armazenar JWT no localStorage após login | Alta |
+| API-03 | Exibir estado logado/deslogado no header do site | Alta |
+| API-04 | Registrar resultado (jogo, resultado, tempo) ao completar sala | Alta |
+| API-05 | Exibir ranking geral de jogadores no site | Alta |
+| API-06 | Ranking ordenado por menor tempo + mais jogos | Alta |
+| API-07 | Mostrar avatar e nome do Google no perfil logado | Média |
+| API-08 | Botão de logout que limpa localStorage | Média |
+| API-09 | Proteger chamadas à API com Bearer token | Alta |
+| API-10 | Tratar erros de autenticação (token expirado, inválido) | Média |
+
+### Checklist de Implementação da Integração
+
+- [ ] Script do Google Identity Services carregado no HTML
+- [ ] Botão de login Google visível no header/site
+- [ ] Callback `handleCredentialResponse` implementado
+- [ ] JWT salvo no localStorage após login bem-sucedido
+- [ ] UI reflete estado logado (nome do usuário, avatar, botão logout)
+- [ ] Função `registrarResultado()` disponível globalmente ou como módulo
+- [ ] Cada sala chama `registrarResultado()` ao ser completada
+- [ ] Seção de ranking implementada no site
+- [ ] Ranking busca dados da API e exibe ordenado
+- [ ] Tratamento de erros de rede/autenticação implementado

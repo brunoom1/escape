@@ -48,6 +48,7 @@
   <div id="inventory"></div>
 
   <!-- Lib -->
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -126,6 +127,9 @@
       else msg('Depósito refrigerado. Prateleiras de reagentes sob luz fluorescente. Vapores de condensação no ar.');
     }
     msg('⚠️ ALERTA: Vazamento detectado no Laboratório Helix. Sistema de ventilação selou todas as saídas. Neutralize a toxina para escapar.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     // ============ OBJETOS (posições da POSITION TABLE) ============
@@ -444,6 +448,10 @@
         painelPurifAberto = false;
         UIPanel.hide('puzzle-panel');
         timer.stop();
+        const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+        if (EscapeAPI.isLoggedIn()) {
+          EscapeAPI.registrarResultado('Sala 2 — Protocolo Omega', 'win', tempoSeg);
+        }
         UISuccessOverlay.show('success-overlay', {
           title: '🎉 PROTOCOLO OMEGA COMPLETO!',
           subtitle: 'O antídoto neutralizou a toxina. Sistema de ventilação reativado. Você salvou o laboratório.',

@@ -34,6 +34,7 @@
   <div id="message"></div>
   <div id="inventory"></div>
 
+  <script src="../lib/api.js"></script>
   <script src="../lib/engine.js"></script>
   <script src="../lib/input.js"></script>
   <script src="../lib/state.js"></script>
@@ -87,6 +88,9 @@
       else msg('Módulo da Cápsula. O painel de ignição aguarda a sequência correta para lançamento.');
     }
     msg('Você acorda numa estação espacial à deriva. Sistemas offline. Gravidade artificial falhando. Encontre a cápsula de fuga.');
+    if (!EscapeAPI.isLoggedIn()) {
+      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+    }
     timer.start();
 
     // OBJETOS
@@ -200,6 +204,10 @@
           if (seq.includes('')) { msg('Selecione todos os 4 sistemas.'); return; }
           if (seq[0]==='Motor' && seq[1]==='Oxigênio' && seq[2]==='Navegação' && seq[3]==='Propulsão') {
             UIPanel.hide('puzzle-panel'); timer.stop();
+            const tempoSeg = Math.floor(timer.getElapsed() / 1000);
+            if (EscapeAPI.isLoggedIn()) {
+              EscapeAPI.registrarResultado('Sala 4 — Estação Espacial', 'win', tempoSeg);
+            }
             UISuccessOverlay.show('success-overlay', { title: '🚀 IGNIÇÃO BEM-SUCEDIDA!', subtitle: 'A cápsula se desacopla da estação. Você está a caminho de Proxima Centauri. Sobreviveu.', time: timer.format(), links: [{ text: '← Voltar ao Lobby', href: '../index.html' }] });
           } else { msg('❌ Falha na ignição! Sistemas em conflito. A sequência está incorreta. Tente novamente.'); }
         });
