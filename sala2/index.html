@@ -334,7 +334,6 @@
       UIInventory.render('inventory', inv.getAll());
     }
 
-    // ============ PUZZLE: PAINEL DE ALARME (Simon Says) ============
     // ============ PUZZLE: PAINEL DE ALARME (Simon Says — 3 rounds) ============
     let painelAlarmeAberto = false;
     const CORES = ['blue', 'red', 'green', 'yellow'];
@@ -449,7 +448,7 @@
             document.querySelectorAll('.simon-btn').forEach(b => { b.style.opacity = '0.3'; b.style.cursor = 'default'; });
             document.getElementById('simon-start').style.display = 'none';
             msg('✅ Alarme desativado! O painel exibe "CÓDIGO BACKUP: 274". Portas do depósito desbloqueadas.');
-            setTimeout(() => { UIPanel.hide('puzzle-panel'); }, 2500);
+            setTimeout(() => { painelAlarmeAberto = false; UIPanel.hide('puzzle-panel'); }, 2500);
           } else {
             document.getElementById('simon-round').textContent = ROUNDS[simonRound].label + ' ✅';
             document.getElementById('simon-status').textContent = '✔ Rodada concluída! Iniciando próxima...';
