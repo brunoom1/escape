@@ -335,12 +335,26 @@
     }
 
     // ============ PUZZLE: PAINEL DE ALARME (Simon Says) ============
+    // ============ PUZZLE: PAINEL DE ALARME (Simon Says — 3 rounds) ============
     let painelAlarmeAberto = false;
-    const SIMON_SEQ = ['blue', 'red', 'green'];
-    let simonIndex = 0;
+    const CORES = ['blue', 'red', 'green', 'yellow'];
+    const ROUNDS = [
+      { label: 'Rodada 1/3', len: 3 },
+      { label: 'Rodada 2/3', len: 4 },
+      { label: 'Rodada 3/3', len: 5 },
+    ];
+    let simonRound = 0;
+    let simonSeq = [];
+    let simonIdx = 0;
     let simonInput = [];
     let simonPlaying = false;
     let simonResolvido = false;
+
+    function sortearSeq(tamanho) {
+      const s = [];
+      for (let i = 0; i < tamanho; i++) s.push(CORES[Math.floor(Math.random() * CORES.length)]);
+      return s;
+    }
 
     function abrirPainelAlarme() {
       if (state.get('alarmeDesligado')) {
@@ -348,12 +362,14 @@
         return;
       }
       simonResolvido = false;
+      simonRound = 0;
       painelAlarmeAberto = true;
       const html = `
         <div style="text-align:center; font-family:monospace;">
-          <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">🔴 Painel de Alarme</p>
-          <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:10px;">Repita a sequência de luzes para desativar.</p>
-          <div id="simon-status" style="color:${UITokens.get('colorAccent')}; font-size:0.9rem; margin-bottom:10px; min-height:22px;">Pressione "Iniciar" para ver a sequência.</div>
+          <p style="color:${UITokens.get('colorText')}; margin-bottom:4px;">🔴 Painel de Alarme</p>
+          <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:6px;">3 rodadas. Uma falha e volta ao início.</p>
+          <div id="simon-round" style="color:#ffb74d; font-size:0.85rem; margin-bottom:2px;">Rodada 1/3</div>
+          <div id="simon-status" style="color:${UITokens.get('colorAccent')}; font-size:0.85rem; margin-bottom:10px; min-height:20px;">Pressione "Iniciar".</div>
           <div style="display:flex; gap:12px; justify-content:center; margin-bottom:14px;">
             <button class="simon-btn" data-color="blue" style="width:58px;height:58px;border-radius:50%;background:#1565c0;border:3px solid #0d47a1;color:#fff;font-size:1.4rem;cursor:pointer;opacity:0.6;transition:opacity 0.08s, box-shadow 0.08s;">🔵</button>
             <button class="simon-btn" data-color="red" style="width:58px;height:58px;border-radius:50%;background:#c62828;border:3px solid #b71c1c;color:#fff;font-size:1.4rem;cursor:pointer;opacity:0.6;transition:opacity 0.08s, box-shadow 0.08s;">🔴</button>
@@ -368,7 +384,7 @@
       UIPanel.setContent('puzzle-panel', html);
       UIPanel.show('puzzle-panel');
       setTimeout(bindSimon, 50);
-      msg('O painel de alarme tem 4 luzes coloridas. Parece um teste de resposta — o sistema espera uma sequência.');
+      msg('O painel de alarme tem 4 luzes coloridas. São 3 rodadas — qualquer erro reinicia o teste.');
     }
 
     function bindSimon() {
@@ -381,28 +397,30 @@
 
     function iniciarSimon() {
       if (simonResolvido) return;
-      simonIndex = 0;
+      simonSeq = sortearSeq(ROUNDS[simonRound].len);
+      simonIdx = 0;
       simonInput = [];
       simonPlaying = true;
+      document.getElementById('simon-round').textContent = ROUNDS[simonRound].label;
       document.getElementById('simon-status').textContent = '👀 Observe a sequência...';
       document.getElementById('simon-start').style.display = 'none';
       tocarProximo();
     }
 
     function tocarProximo() {
-      if (simonIndex >= SIMON_SEQ.length) {
+      if (simonIdx >= simonSeq.length) {
         simonPlaying = false;
         document.getElementById('simon-status').textContent = '🎯 Sua vez! Repita a sequência.';
         return;
       }
-      const cor = SIMON_SEQ[simonIndex];
+      const cor = simonSeq[simonIdx];
       const btn = document.querySelector(`.simon-btn[data-color="${cor}"]`);
       btn.style.opacity = '1';
       btn.style.boxShadow = '0 0 22px rgba(255,255,255,0.6)';
       setTimeout(() => {
         btn.style.opacity = '0.6';
         btn.style.boxShadow = 'none';
-        simonIndex++;
+        simonIdx++;
         setTimeout(tocarProximo, 280);
       }, 450);
     }
@@ -417,22 +435,32 @@
         this.style.boxShadow = 'none';
       }, 200);
 
-      const esperada = SIMON_SEQ[simonInput.length];
+      const esperada = simonSeq[simonInput.length];
       if (cor === esperada) {
         simonInput.push(cor);
-        if (simonInput.length === SIMON_SEQ.length) {
-          simonResolvido = true;
-          state.set('alarmeDesligado', true);
-          UITabs.unlock('tabs', 'deposito');
-          document.getElementById('simon-status').textContent = '✅ Alarme desativado! CÓDIGO BACKUP: 274';
-          document.querySelectorAll('.simon-btn').forEach(b => { b.style.opacity = '0.3'; b.style.cursor = 'default'; });
-          document.getElementById('simon-start').style.display = 'none';
-          msg('✅ Alarme desativado! O painel exibe "CÓDIGO BACKUP: 274". Portas do depósito desbloqueadas.');
-          setTimeout(() => { UIPanel.hide('puzzle-panel'); }, 2500);
+        if (simonInput.length === simonSeq.length) {
+          simonRound++;
+          if (simonRound >= ROUNDS.length) {
+            simonResolvido = true;
+            state.set('alarmeDesligado', true);
+            UITabs.unlock('tabs', 'deposito');
+            document.getElementById('simon-round').textContent = '✅ COMPLETO';
+            document.getElementById('simon-status').textContent = 'Alarme desativado! CÓDIGO BACKUP: 274';
+            document.querySelectorAll('.simon-btn').forEach(b => { b.style.opacity = '0.3'; b.style.cursor = 'default'; });
+            document.getElementById('simon-start').style.display = 'none';
+            msg('✅ Alarme desativado! O painel exibe "CÓDIGO BACKUP: 274". Portas do depósito desbloqueadas.');
+            setTimeout(() => { UIPanel.hide('puzzle-panel'); }, 2500);
+          } else {
+            document.getElementById('simon-round').textContent = ROUNDS[simonRound].label + ' ✅';
+            document.getElementById('simon-status').textContent = '✔ Rodada concluída! Iniciando próxima...';
+            document.getElementById('simon-start').style.display = 'inline-block';
+          }
         }
       } else {
+        simonRound = 0;
         simonInput = [];
-        document.getElementById('simon-status').textContent = '❌ Sequência errada. Pressione "Iniciar" para tentar novamente.';
+        document.getElementById('simon-round').textContent = 'Rodada 1/3';
+        document.getElementById('simon-status').textContent = '❌ Erro! Teste reiniciado. Pressione "Iniciar".';
         document.getElementById('simon-start').style.display = 'inline-block';
       }
     }
