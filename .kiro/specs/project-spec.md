@@ -390,17 +390,35 @@ function renderAmbiente1(ctx, state) {
 ## 11. Processo de Publicacao
 
 ### Commits Semanticos
+
 ```
-feat(salaN): [descricao]       ← nova feature/sala
-fix(salaN): [descricao]        ← correcao de bug
-refactor(salaN): [descricao]   ← refatoracao sem mudanca funcional
-docs: [descricao]              ← documentacao
-style: [descricao]             ← formatacao, sem mudanca logica
+<tipo>(<escopo>): <descricao>
 ```
 
-### Push (Windows — credential helper bloqueado)
+| Tipo | Quando usar | Exemplo |
+|------|-------------|---------|
+| `feat` | Nova funcionalidade (sala, modulo, componente) | `feat: implementar Sala 16` |
+| `fix` | Correcao de bug | `fix(sala16): hit area da gaveta desalinhada` |
+| `refactor` | Reestruturacao sem mudanca funcional | `refactor(lib): extrair modulo de audio` |
+| `docs` | Documentacao (specs, steering, narrativa) | `docs: adicionar spec da Sala 16` |
+| `style` | Ajustes visuais (CSS, tokens, temas) | `style(sala3): corrigir contraste do texto` |
+| `chore` | Manutencao (configs, estrutura, gitignore) | `chore: adicionar README` |
+
+**Regra:** o primeiro commit de uma nova sala DEVE ser a spec (`docs: adicionar spec da Sala N`). Commits de implementacao vem depois.
+
+### Sequencia de Commits por Sala
+
+```
+1. docs: adicionar spec da Sala N          ← spec completa em .kiro/specs/salaN-slug/
+2. feat: implementar Sala N — Nome         ← index.html + render.js + assets
+3. feat(site): adicionar card da Sala N    ← atualizar index.html (lobby + ranking)
+4. fix(salaN): ...                         ← correcoes pos-validacao (se necessario)
+```
+
+### Push
+
 ```bash
-git -c credential.helper="" push https://brunoom1:[TOKEN]@github.com/brunoom1/escape.git master
+git push origin master
 ```
 
 ### Verificacao Pos-Deploy
@@ -416,7 +434,8 @@ git -c credential.helper="" push https://brunoom1:[TOKEN]@github.com/brunoom1/es
 
 ### Pre-Producao
 - [ ] Ideia do ambiente (cenario, tematica, nivel de dificuldade)
-- [ ] Spec Designer cria `requirements.md`, `design.md`, `tasks.md`
+- [ ] Spec Designer cria pasta `.kiro/specs/salaN-slug/` com `requirements.md`
+- [ ] Commit da spec: `docs: adicionar spec da Sala N`
 - [ ] Gerente aprova spec e inicia o ciclo
 
 ### Producao
@@ -453,6 +472,13 @@ git -c credential.helper="" push https://brunoom1:[TOKEN]@github.com/brunoom1/es
 | 7 | `sala7/` | Orient Express | Vagao + Restaurante + Bagageiro | Cinematografica |
 | 8 | `sala8/` | Piramide de Khufu | Entrada + Camara + Sarcofago | Cinematografica |
 | 9 | `sala9/` | Bunker Sovietico | Sala Comando + Reator + Saida | Cinematografica |
+| 10 | `sala10/` | Farol da Tempestade | — | — |
+| 11 | `sala11/` | O Grande Hotel | — | — |
+| 12 | `sala12/` | O Teatro Fantasma | — | — |
+| 13 | `sala13/` | A Mina Abandonada | — | — |
+| 14 | `sala14/` | O Observatorio | — | — |
+| 15 | `sala15/` | A Oficina do Relojoeiro | — | — |
+| 16 | `sala16/` | O Cofre do Banco | Tesouraria + Escritorio | Publicada |
 
 ---
 
@@ -484,7 +510,8 @@ Referencia completa em `.kiro/steering/lessons-learned.md`. Resumo:
 ## 16. Extensibilidade Futura
 
 ### Novas Salas
-- Criar spec em `.kiro/specs/salaN-[slug]/`
+- Criar spec em `.kiro/specs/salaN-slug/requirements.md`
+- Primeiro commit DEVE ser a spec (`docs: adicionar spec da Sala N`)
 - Seguir template da secao 9
 - Nunca modificar lib/ de forma que quebre salas existentes
 
