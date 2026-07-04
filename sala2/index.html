@@ -179,17 +179,17 @@
         if (!state.get('computador')) {
           state.set('computador', true);
           inv.add('formula', '💻', 'Fórmula: tipos na ordem ácido→catalisador→base→oxidante');
-          msg('Tela: "Protocolo de neutralização: aplicar reagentes por tipo — ácido (pH<3) → catalisador (pH neutro) → base (pH>12) → oxidante. SEQUÊNCIA CRÍTICA."');
+          msg('Tela: "Protocolo de neutralização: aplicar reagentes por tipo — ácido (pH<3) → catalisador (pH neutro) → base (pH>12) → oxidante. SEQUÊNCIA CRÍTICA." Aba de logs: ALARM LOG — setor 7 do sistema de pressão apresenta falha intermitente.');
         } else {
-          msg('Fórmula: tipos na ordem ácido → catalisador → base → oxidante.');
+          msg('Fórmula: tipos na ordem ácido → catalisador → base → oxidante. Log: setor 7 do alarme com falha.');
         }
       } else if (id === 'microscopio') {
         if (!state.get('microscopio')) {
           state.set('microscopio', true);
           inv.add('amostra', '🔬', 'Toxina reage a pH extremos');
-          msg('Amostra da toxina no microscópio. A estrutura molecular se decompõe em pH extremos — precisa de ácido e base na sequência correta.');
+          msg('Amostra da toxina no microscópio. A etiqueta da lâmina: "AM-4 — toxina em fase de análise". A estrutura molecular se decompõe em pH extremos — precisa de ácido e base na sequência correta.');
         } else {
-          msg('A toxina se decompõe com ácido e base aplicados na ordem.');
+          msg('Lâmina AM-4. A toxina se decompõe com ácido e base aplicados na ordem.');
         }
       } else if (id === 'centrifuga') {
         if (!state.get('centrifuga')) {
@@ -206,11 +206,11 @@
           state.set('clipboard', true);
           state.set('crachaColetado', true);
           inv.add('cracha', '🪪', 'Crachá de acesso nível 3');
-          inv.add('codigo_alarme', '🔢', 'Post-it com código de 3 dígitos');
+          inv.add('codigo_alarme', '🔢', 'Post-it: primeiro dígito = 2');
           UITabs.unlock('tabs', 'contencao');
-          msg('Atrás do clipboard: crachá de segurança nível 3 e um post-it com um código de 3 dígitos. Porta da contenção desbloqueada!');
+          msg('Atrás do clipboard: crachá de segurança nível 3. Um post-it desbotado: "alarme: 2__" (só o primeiro dígito sobreviveu ao tempo). Porta da contenção desbloqueada!');
         } else {
-          msg('Crachá nível 3 coletado. Post-it com código de 3 dígitos.');
+          msg('Crachá nível 3 coletado. Post-it: primeiro dígito = 2.');
         }
       } else if (id === 'portaContencao') {
         if (state.get('crachaColetado')) {
