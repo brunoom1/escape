@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "username": "gabrielmendonca",
+  "default_agent": "general",
+  "agent": {
+    "especialista-ux": {
+      "description": "UX/UI specialist for improving user experience and interface design.",
+      "mode": "subagent"
+    },
+    "roteirista": {
+      "description": "Writes and reviews escape room storylines, puzzles, and narrative flow.",
+      "mode": "subagent"
+    },
+    "webmaster": {
+      "description": "Handles web infrastructure, deployment, and server configuration.",
+      "mode": "subagent"
+    }
+  }
+}
