@@ -250,8 +250,6 @@ function renderLab_Objetos(ctx, state) {
     ctx.fillStyle = '#00ff88';
     ctx.fillText('> FÓRMULA CARREGADA', 370, 119);
     ctx.fillText('> ácido→catal→base→oxi', 370, 132);
-    ctx.fillStyle = '#ff6644';
-    ctx.fillText('> SENSOR 7: OFFLINE', 370, 145);
   } else {
     ctx.fillStyle = '#33aa55';
     ctx.fillText('> ACESSO PENDENTE...', 370, 119);

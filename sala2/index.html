@@ -179,17 +179,17 @@
         if (!state.get('computador')) {
           state.set('computador', true);
           inv.add('formula', '💻', 'Fórmula: tipos na ordem ácido→catalisador→base→oxidante');
-          msg('Tela: "Protocolo de neutralização: aplicar reagentes por tipo — ácido (pH<3) → catalisador (pH neutro) → base (pH>12) → oxidante. SEQUÊNCIA CRÍTICA." Aba de logs: ALARM LOG — setor 7 do sistema de pressão apresenta falha intermitente.');
+          msg('Tela: "Protocolo de neutralização: aplicar reagentes por tipo — ácido (pH<3) → catalisador (pH neutro) → base (pH>12) → oxidante. SEQUÊNCIA CRÍTICA."');
         } else {
-          msg('Fórmula: tipos na ordem ácido → catalisador → base → oxidante. Log: setor 7 do alarme com falha.');
+          msg('Fórmula: tipos na ordem ácido → catalisador → base → oxidante.');
         }
       } else if (id === 'microscopio') {
         if (!state.get('microscopio')) {
           state.set('microscopio', true);
           inv.add('amostra', '🔬', 'Toxina reage a pH extremos');
-          msg('Amostra da toxina no microscópio. A etiqueta da lâmina: "AM-4 — toxina em fase de análise". A estrutura molecular se decompõe em pH extremos — precisa de ácido e base na sequência correta.');
+          msg('Amostra da toxina no microscópio. A estrutura molecular se decompõe em pH extremos — precisa de ácido e base na sequência correta.');
         } else {
-          msg('Lâmina AM-4. A toxina se decompõe com ácido e base aplicados na ordem.');
+          msg('A toxina se decompõe com ácido e base aplicados na ordem.');
         }
       } else if (id === 'centrifuga') {
         if (!state.get('centrifuga')) {
@@ -206,11 +206,10 @@
           state.set('clipboard', true);
           state.set('crachaColetado', true);
           inv.add('cracha', '🪪', 'Crachá de acesso nível 3');
-          inv.add('codigo_alarme', '🔢', 'Post-it: primeiro dígito = 2');
           UITabs.unlock('tabs', 'contencao');
-          msg('Atrás do clipboard: crachá de segurança nível 3. Um post-it desbotado: "alarme: 2__" (só o primeiro dígito sobreviveu ao tempo). Porta da contenção desbloqueada!');
+          msg('Atrás do clipboard: crachá de segurança nível 3. A porta da contenção está desbloqueada!');
         } else {
-          msg('Crachá nível 3 coletado. Post-it: primeiro dígito = 2.');
+          msg('Crachá nível 3 já coletado.');
         }
       } else if (id === 'portaContencao') {
         if (state.get('crachaColetado')) {
@@ -335,51 +334,106 @@
       UIInventory.render('inventory', inv.getAll());
     }
 
-    // ============ PUZZLE: PAINEL DE ALARME (código 274) ============
+    // ============ PUZZLE: PAINEL DE ALARME (Simon Says) ============
     let painelAlarmeAberto = false;
+    const SIMON_SEQ = ['blue', 'red', 'green'];
+    let simonIndex = 0;
+    let simonInput = [];
+    let simonPlaying = false;
+    let simonResolvido = false;
 
     function abrirPainelAlarme() {
       if (state.get('alarmeDesligado')) {
         msg('Alarme já desligado. Sistema estável.');
         return;
       }
+      simonResolvido = false;
       painelAlarmeAberto = true;
       const html = `
-        <p style="color:${UITokens.get('colorText')}; margin-bottom:12px;">🔴 Painel de Alarme — Código de desativação (3 dígitos)</p>
-        <input type="text" id="alarmeInput" maxlength="3" placeholder="_ _ _"
-          style="background:#0a0a0a; border:1px solid #c62828; color:#ef5350; font-family:'Courier New'; font-size:1.5rem; padding:10px; width:120px; text-align:center; border-radius:4px;">
-        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-          <button id="btnAlarme" style="padding:8px 20px; background:#0f1a12; border:1px solid #1b5e20; color:#c8e6c9; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Inserir</button>
-          <button id="btnAlarmeVoltar" style="padding:8px 20px; background:#0f1a12; border:1px solid #1b5e20; color:#c8e6c9; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Voltar</button>
-        </div>
-      `;
+        <div style="text-align:center; font-family:monospace;">
+          <p style="color:${UITokens.get('colorText')}; margin-bottom:6px;">🔴 Painel de Alarme</p>
+          <p style="color:${UITokens.get('colorTextMuted')}; font-size:0.8rem; margin-bottom:10px;">Repita a sequência de luzes para desativar.</p>
+          <div id="simon-status" style="color:${UITokens.get('colorAccent')}; font-size:0.9rem; margin-bottom:10px; min-height:22px;">Pressione "Iniciar" para ver a sequência.</div>
+          <div style="display:flex; gap:12px; justify-content:center; margin-bottom:14px;">
+            <button class="simon-btn" data-color="blue" style="width:58px;height:58px;border-radius:50%;background:#1565c0;border:3px solid #0d47a1;color:#fff;font-size:1.4rem;cursor:pointer;opacity:0.6;transition:opacity 0.08s, box-shadow 0.08s;">🔵</button>
+            <button class="simon-btn" data-color="red" style="width:58px;height:58px;border-radius:50%;background:#c62828;border:3px solid #b71c1c;color:#fff;font-size:1.4rem;cursor:pointer;opacity:0.6;transition:opacity 0.08s, box-shadow 0.08s;">🔴</button>
+            <button class="simon-btn" data-color="green" style="width:58px;height:58px;border-radius:50%;background:#2e7d32;border:3px solid #1b5e20;color:#fff;font-size:1.4rem;cursor:pointer;opacity:0.6;transition:opacity 0.08s, box-shadow 0.08s;">🟢</button>
+            <button class="simon-btn" data-color="yellow" style="width:58px;height:58px;border-radius:50%;background:#f57f17;border:3px solid #e65100;color:#fff;font-size:1.4rem;cursor:pointer;opacity:0.6;transition:opacity 0.08s, box-shadow 0.08s;">🟡</button>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button id="simon-start" style="padding:7px 18px;background:#0f1a12;border:1px solid #1b5e20;color:#c8e6c9;font-family:monospace;cursor:pointer;border-radius:4px;">▶ Iniciar</button>
+            <button id="simon-voltar" style="padding:7px 18px;background:#0f1a12;border:1px solid #1b5e20;color:#c8e6c9;font-family:monospace;cursor:pointer;border-radius:4px;">Voltar</button>
+          </div>
+        </div>`;
       UIPanel.setContent('puzzle-panel', html);
       UIPanel.show('puzzle-panel');
-      setTimeout(() => {
-        document.getElementById('alarmeInput').focus();
-        document.getElementById('btnAlarme').addEventListener('click', tentarAlarme);
-        document.getElementById('btnAlarmeVoltar').addEventListener('click', fecharAlarme);
-        document.getElementById('alarmeInput').addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') tentarAlarme();
-        });
-      }, 50);
-      msg('Painel de alarme. Teclado numérico exige código de 3 dígitos para desativação.');
+      setTimeout(bindSimon, 50);
+      msg('O painel de alarme tem 4 luzes coloridas. Parece um teste de resposta — o sistema espera uma sequência.');
     }
 
-    function tentarAlarme() {
-      const el = document.getElementById('alarmeInput');
-      if (!el) return;
-      const valor = el.value.trim();
-      if (valor === '274') {
-        state.set('alarmeDesligado', true);
-        painelAlarmeAberto = false;
-        UIPanel.hide('puzzle-panel');
-        UITabs.unlock('tabs', 'deposito');
-        msg('✅ Alarme desativado! Portas do depósito desbloqueadas. O silêncio toma conta do laboratório.');
+    function bindSimon() {
+      document.getElementById('simon-start').addEventListener('click', iniciarSimon);
+      document.getElementById('simon-voltar').addEventListener('click', fecharAlarme);
+      document.querySelectorAll('.simon-btn').forEach(b => {
+        b.addEventListener('click', clicarSimon);
+      });
+    }
+
+    function iniciarSimon() {
+      if (simonResolvido) return;
+      simonIndex = 0;
+      simonInput = [];
+      simonPlaying = true;
+      document.getElementById('simon-status').textContent = '👀 Observe a sequência...';
+      document.getElementById('simon-start').style.display = 'none';
+      tocarProximo();
+    }
+
+    function tocarProximo() {
+      if (simonIndex >= SIMON_SEQ.length) {
+        simonPlaying = false;
+        document.getElementById('simon-status').textContent = '🎯 Sua vez! Repita a sequência.';
+        return;
+      }
+      const cor = SIMON_SEQ[simonIndex];
+      const btn = document.querySelector(`.simon-btn[data-color="${cor}"]`);
+      btn.style.opacity = '1';
+      btn.style.boxShadow = '0 0 22px rgba(255,255,255,0.6)';
+      setTimeout(() => {
+        btn.style.opacity = '0.6';
+        btn.style.boxShadow = 'none';
+        simonIndex++;
+        setTimeout(tocarProximo, 280);
+      }, 450);
+    }
+
+    function clicarSimon() {
+      if (simonPlaying || simonResolvido) return;
+      const cor = this.dataset.color;
+      this.style.opacity = '1';
+      this.style.boxShadow = '0 0 22px rgba(255,255,255,0.6)';
+      setTimeout(() => {
+        this.style.opacity = '0.6';
+        this.style.boxShadow = 'none';
+      }, 200);
+
+      const esperada = SIMON_SEQ[simonInput.length];
+      if (cor === esperada) {
+        simonInput.push(cor);
+        if (simonInput.length === SIMON_SEQ.length) {
+          simonResolvido = true;
+          state.set('alarmeDesligado', true);
+          UITabs.unlock('tabs', 'deposito');
+          document.getElementById('simon-status').textContent = '✅ Alarme desativado! CÓDIGO BACKUP: 274';
+          document.querySelectorAll('.simon-btn').forEach(b => { b.style.opacity = '0.3'; b.style.cursor = 'default'; });
+          document.getElementById('simon-start').style.display = 'none';
+          msg('✅ Alarme desativado! O painel exibe "CÓDIGO BACKUP: 274". Portas do depósito desbloqueadas.');
+          setTimeout(() => { UIPanel.hide('puzzle-panel'); }, 2500);
+        }
       } else {
-        msg('❌ Código incorreto. O alarme continua pulsando.');
-        el.value = '';
-        el.focus();
+        simonInput = [];
+        document.getElementById('simon-status').textContent = '❌ Sequência errada. Pressione "Iniciar" para tentar novamente.';
+        document.getElementById('simon-start').style.display = 'inline-block';
       }
     }
 
