@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sala 17 — O Sanatório Abandonado</title>
+  <title>Sala 17 — O Sanatório Santa Clara</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -55,8 +55,8 @@
   <script src="../lib/inventory.js"></script>
   <script src="../lib/transitions.js"></script>
   <script src="../lib/timer.js"></script>
-  <script src="../lib/events.js"></script>
   <script src="../lib/particles.js"></script>
+  <script src="../lib/events.js"></script>
 
   <!-- UI Kit -->
   <script src="../ui-kit/tokens.js"></script>
@@ -74,33 +74,41 @@
     // ============ SETUP ============
     UITokens.apply(ThemeAsylum);
 
-    const game = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a0e0c' });
+    const game  = EscapeEngine.create({ canvasId: 'gameCanvas', width: 900, height: 600, backgroundColor: '#0a0e0c' });
     const input = EscapeInput.create(game.getCanvas(), 900, 600);
     const state = EscapeState.create({ ambiente: 'recepcao', flags: {
-      quadroVisto: false, arquivoVisto: false, gavetaAberta: false,
-      chaveGerador: false, poraoVisitado: false, dieselColetado: false,
-      geradorLigado: false, diretoriaAcessivel: false, mesaVista: false,
-      bilheteVisto: false, cofreAberto: false, portaVista: false,
-      escapou: false
+      quadroVisto: false, arquivoVisto: false, gavetaAberta: false, chaveEnfermaria: false,
+      cartaLuciaLida: false, prontuarioVisto: false, diarioVisto: false,
+      armarioVisto: false, painelResolvido: false, energiaRestaurada: false,
+      dieselColetado: false, geradorLigado: false, diretoriaAcessivel: false,
+      mesaVista: false, bilheteLido: false, diarioMorettiLido: false, cofreAberto: false,
+      poraoVisitado: false, escapou: false, energiaParcial: false
     }});
-    const inv = EscapeInventory.create();
+    const inv   = EscapeInventory.create();
     const timer = EscapeTimer.create();
-    const bus = EscapeEvents.create();
+    const bus   = EscapeEvents.create();
 
-    // UI Components
+    // ============ UI COMPONENTS ============
     UITabs.create('tabs', [
-      { id: 'recepcao', label: 'Recepção', locked: false },
-      { id: 'porao', label: 'Porão', locked: true }
+      { id: 'recepcao', label: 'Recep\u00e7\u00e3o', locked: false },
+      { id: 'enfermaria', label: 'Enfermaria', locked: true },
+      { id: 'porao', label: 'Por\u00e3o', locked: true }
     ], (tabId) => {
-      if (tabId === 'porao' && !state.get('chaveGerador')) {
-        msg('A porta do porão está trancada. Precisa da chave do gerador.');
+      if (tabId === 'enfermaria' && !state.get('chaveEnfermaria')) {
+        msg('A porta da enfermaria est\u00e1 trancada. Encontre a chave primeiro.');
         UITabs.setActive('tabs', 'recepcao');
+        return;
+      }
+      if (tabId === 'porao' && !state.get('energiaRestaurada')) {
+        msg('A porta do por\u00e3o est\u00e1 trancada. Restaure a energia primeiro.');
+        UITabs.setActive('tabs', state.get('chaveEnfermaria') ? 'enfermaria' : 'recepcao');
         return;
       }
       EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
         state.setAmbiente(tabId);
-        if (tabId === 'porao') msg('O porão. Escuro, abafado. Canos gotejam. O gerador está silencioso. Uma porta entreaberta leva à antiga diretoria.');
-        else msg('De volta à recepção do sanatório.');
+        if (tabId === 'enfermaria') msg('Corredor da Enfermaria. Macas vazias, arm\u00e1rios revirados. O sil\u00eancio \u00e9 ainda mais pesado aqui.');
+        else if (tabId === 'porao') { state.set('poraoVisitado', true); msg('O por\u00e3o. Escuro, abafado. Canos gotejam. O gerador est\u00e1 silencioso. H\u00e1 uma porta marcada DIRETORIA.'); }
+        else msg('De volta \u00e0 recep\u00e7\u00e3o do sanat\u00f3rio.');
       });
     });
 
@@ -116,41 +124,62 @@
     });
 
     function msg(text) { UIMessageBox.show('message', text); }
-    msg('Sanatório Santa Clara. O silêncio é pesado. Cheiro de mofo e desinfetante velho. A porta de ferro rangeu atrás de você — trancada.');
+    msg('Sanat\u00f3rio Santa Clara. O sil\u00eancio \u00e9 pesado. Cheiro de mofo e desinfetante velho. A porta de ferro rangeu atr\u00e1s de voc\u00ea — trancada.');
     if (!EscapeAPI.isLoggedIn()) {
-      setTimeout(() => msg('⚠️ Você não está logado. Seu tempo não será registrado no ranking. Faça login no lobby para participar!'), 3000);
+      setTimeout(() => msg('\u26a0\ufe0f Voc\u00ea n\u00e3o est\u00e1 logado. Seu tempo n\u00e3o ser\u00e1 registrado no ranking.'), 3000);
     }
     timer.start();
 
     // ============ OBJETOS ============
     const objetosRecepcao = [
-      { id: 'portaPrincipal', x: 810, y: 100, w: 75, h: 340, label: 'Porta principal' },
-      { id: 'quadroMoretti', x: 340, y: 40, w: 220, h: 170, label: 'Quadro Dr. Moretti' },
-      { id: 'arquivoMorto', x: 90, y: 260, w: 120, h: 160, label: 'Arquivo morto' },
-      { id: 'gaveta', x: 230, y: 370, w: 95, h: 55, label: 'Gaveta da recepção' },
-      { id: 'portaPorão', x: 40, y: 390, w: 60, h: 130, label: 'Porta → Porão' },
+      { id: 'portaPrincipal',  x: 810, y: 100, w: 75,  h: 340, label: 'Porta principal' },
+      { id: 'quadroMoretti',   x: 340, y: 40,  w: 220, h: 170, label: 'Quadro do Dr. Moretti' },
+      { id: 'arquivoMorto',    x: 90,  y: 260, w: 120, h: 160, label: 'Arquivo morto' },
+      { id: 'gaveta',          x: 230, y: 370, w: 95,  h: 55,  label: 'Gaveta da recep\u00e7\u00e3o' },
+      { id: 'cartaLucia',      x: 620, y: 350, w: 80,  h: 70,  label: 'Carta da Enf\u00aa L\u00facia' },
+      { id: 'portaEnfermaria', x: 40,  y: 370, w: 60,  h: 140, label: 'Porta \u2192 Enfermaria' },
     ];
+
+    function getObjetosEnfermaria() {
+      return [
+        { id: 'prontuarioJoao', x: 180, y: 100, w: 80,  h: 120, label: 'Prontu\u00e1rio de paciente' },
+        { id: 'diarioExperimentos', x: 430, y: 80,  w: 80,  h: 120, label: 'Di\u00e1rio de experimentos' },
+        { id: 'painelCronologico',  x: 340, y: 360, w: 230, h: 100, label: 'Painel cronol\u00f3gico' },
+        { id: 'disjuntor',     x: 770, y: 180, w: 80,  h: 100, label: 'Disjuntor' },
+        { id: 'armarioMedicamentos', x: 680, y: 270, w: 60, h: 130, label: 'Arm\u00e1rio de medicamentos' },
+        { id: 'portaRecepcao', x: 740, y: 480, w: 130, h: 80,  label: 'Voltar \u00e0 Recep\u00e7\u00e3o' },
+        { id: 'portaPorao',    x: 30,  y: 430, w: 65,  h: 100, label: 'Porta \u2192 Por\u00e3o' },
+      ];
+    }
 
     function getObjetosPorao() {
       const objs = [];
-      objs.push({ id: 'gerador', x: 130, y: 250, w: 160, h: 140, label: 'Gerador' });
+      objs.push({ id: 'gerador', x: 100, y: 280, w: 160, h: 130, label: 'Gerador' });
       if (!state.get('dieselColetado')) {
-        objs.push({ id: 'caixotes', x: 340, y: 310, w: 85, h: 110, label: 'Caixotes' });
+        objs.push({ id: 'caixotes', x: 320, y: 305, w: 90, h: 130, label: 'Caixotes' });
       }
-      objs.push({ id: 'diretoria', x: 680, y: 250, w: 60, h: 140, label: 'Porta → Diretoria' });
       if (state.get('diretoriaAcessivel')) {
-        objs.push({ id: 'mesaDiretoria', x: 520, y: 330, w: 140, h: 90, label: 'Mesa da diretoria' });
-        objs.push({ id: 'cofre', x: 580, y: 100, w: 100, h: 90, label: 'Cofre' });
+        objs.push({ id: 'mesaDiretoria',  x: 550, y: 300, w: 150, h: 65,  label: 'Mesa da diretoria' });
+        objs.push({ id: 'gavetaDiretoria', x: 580, y: 340, w: 35,  h: 20,  label: 'Gaveta da mesa' });
+        objs.push({ id: 'cofre',          x: 720, y: 60,  w: 110, h: 100, label: 'Cofre' });
+        if (!state.get('diarioMorettiLido')) {
+          objs.push({ id: 'diarioMoretti', x: 680, y: 295, w: 45, h: 55, label: 'Di\u00e1rio pessoal do Dr. Moretti' });
+        }
+      } else {
+        objs.push({ id: 'portaDiretoria', x: 510, y: 35, w: 30, h: 340, label: 'Porta \u2192 Diretoria' });
       }
-      objs.push({ id: 'voltar', x: 735, y: 500, w: 130, h: 55, label: 'Voltar' });
+      objs.push({ id: 'voltar', x: 740, y: 510, w: 130, h: 55, label: 'Voltar \u00e0 Enfermaria' });
       return objs;
     }
 
     function getObjetos() {
-      return state.getAmbiente() === 'recepcao' ? objetosRecepcao : getObjetosPorao();
+      const amb = state.getAmbiente();
+      if (amb === 'recepcao') return objetosRecepcao;
+      if (amb === 'enfermaria') return getObjetosEnfermaria();
+      return getObjetosPorao();
     }
 
-    // ============ INTERAÇÕES ============
+    // ============ INTERAÇÕES — RECEPÇÃO ============
     function interagir(obj) {
       if (EscapeTransitions.isTransitioning()) return;
       const id = obj.id;
@@ -160,218 +189,424 @@
         if (state.get('cofreAberto')) {
           escapar();
         } else {
-          if (!state.get('portaVista')) {
-            state.set('portaVista', true);
-            msg('Porta de ferro maciço, enferrujada. Uma fechadura eletrônica desativada ao lado. Apenas a chave mestra pode abrir manualmente.');
-          } else {
-            msg('Porta trancada. Precisa da chave mestra para abrir.');
-          }
+          msg('Porta de ferro maci\u00e7o, enferrujada. Uma fechadura eletr\u00f4nica desativada ao lado. Apenas a chave mestra pode abrir manualmente.');
         }
       } else if (id === 'quadroMoretti') {
         if (!state.get('quadroVisto')) {
           state.set('quadroVisto', true);
-          inv.add('ano1947', '🖼️', 'Placa: Dr. Moretti — Fundador — 1947');
-          msg('Foto empoeirada em moldura dourada. Dr. Henrique Moretti, olhar severo. Placa: "Dr. Henrique Moretti — Fundador — 1947". Abaixo, gravado: "A mente é o maior dos labirintos."');
+          inv.add('anoFundacao', '\ud83d\uddbc\ufe0f', 'Placa do Dr. Moretti — Fundador');
+          msg('Foto empoeirada em moldura dourada. Dr. Henrique Moretti, olhar severo. Placa: "Dr. Henrique Moretti — Fundador — 1947". Abaixo: "A mente \u00e9 o maior dos labirintos."');
         } else {
-          msg('Dr. Moretti, 1947. "A mente é o maior dos labirintos."');
+          msg('Dr. Moretti, fundador em 1947. "A mente \u00e9 o maior dos labirintos."');
         }
       } else if (id === 'arquivoMorto') {
         if (!state.get('arquivoVisto')) {
           state.set('arquivoVisto', true);
-          inv.add('relatorio', '📄', 'Relatório: código = ano de fundação');
-          msg('Pastas amareladas. "INCIDENTE 1994 — CONFIDENCIAL". Relatório: "Diretor Moretti mantinha tudo trancado no cofre da diretoria. Usava código de 4 dígitos — o ano de fundação do sanatório."');
+          inv.add('relatorio', '\ud83d\udcc4', 'Relat\u00f3rio: c\u00f3digo = ano de funda\u00e7\u00e3o');
+          msg('Pastas amareladas. "INCIDENTE 1994 — CONFIDENCIAL": "Diretor Moretti mantinha tudo trancado no cofre da diretoria. Usava c\u00f3digo de 4 d\u00edgitos — o ano de funda\u00e7\u00e3o do sanat\u00f3rio."');
         } else {
-          msg('Relatório: "Código do cofre = ano de fundação, 4 dígitos."');
+          msg('Relat\u00f3rio: "C\u00f3digo do cofre = ano de funda\u00e7\u00e3o, 4 d\u00edgitos."');
         }
       } else if (id === 'gaveta') {
         if (!state.get('gavetaAberta')) {
           state.set('gavetaAberta', true);
-          state.set('chaveGerador', true);
-          inv.add('chaveGerador', '🔑', 'Chave do gerador');
-          UITabs.unlock('tabs', 'porao');
-          msg('Gaveta emperrada. Com um puxão forte, abre. Dentro: uma chave enferrujada com etiqueta "GERADOR — PORÃO".');
+          state.set('chaveEnfermaria', true);
+          inv.add('chaveEnfermaria', '\ud83d\udd11', 'Chave da enfermaria');
+          UITabs.unlock('tabs', 'enfermaria');
+          msg('Gaveta emperrada. Com um pux\u00e3o forte, abre. Dentro: uma chave com etiqueta "ENFERMARIA — ALA B".');
         } else {
-          msg('Chave do gerador já coletada.');
+          msg('Gaveta j\u00e1 aberta e vazia.');
         }
-      } else if (id === 'portaPorão') {
-        if (state.get('chaveGerador')) {
+      } else if (id === 'cartaLucia') {
+        if (!state.get('cartaLuciaLida')) {
+          state.set('cartaLuciaLida', true);
+          inv.add('cartaLucia', '\ud83d\udce8', 'Carta da Enf\u00aa L\u00facia Vargas');
+          msg('Carta amarelada, assinada pela Enfermeira L\u00facia Vargas: "Denunciei os experimentos ao conselho em 1982. Elena Castillo liderou a revolta dos pacientes. Moretti nos silenciou. Que Deus nos perdoe."');
+        } else {
+          msg('Carta de L\u00facia: "Denunciei em 1982. Elena liderou a revolta. Moretti nos silenciou."');
+        }
+      } else if (id === 'portaEnfermaria') {
+        if (state.get('chaveEnfermaria')) {
           EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
-            state.setAmbiente('porao');
-            UITabs.setActive('tabs', 'porao');
-            msg('O porão. Escuro, abafado. Canos gotejam. O gerador está silencioso. Uma porta entreaberta leva à antiga diretoria.');
+            state.setAmbiente('enfermaria');
+            UITabs.setActive('tabs', 'enfermaria');
+            msg('Corredor da Enfermaria. Macas vazias, arm\u00e1rios revirados. O sil\u00eancio \u00e9 ainda mais pesado aqui.');
           });
         } else {
-          msg('Porta para o porão. Trancada. A etiqueta na fechadura: "GERADOR".');
+          msg('Porta trancada. A placa: "ENFERMARIA — ALA B". Precisa da chave.');
+        }
+      }
+
+      // -- ENFERMARIA --
+      else if (id === 'prontuarioJoao') {
+        if (!state.get('prontuarioVisto')) {
+          state.set('prontuarioVisto', true);
+          inv.add('prontuario', '\ud83d\udccb', 'Prontu\u00e1rio: Jo\u00e3o Ribeiro — 1953');
+          msg('Prontu\u00e1rio m\u00e9dico em cima da maca. "Paciente: Jo\u00e3o Ribeiro. Internado em 1953. Diagn\u00f3stico: Paciente Zero — primeiro a receber o tratamento experimental. Observa\u00e7\u00f5es: rea\u00e7\u00e3o adversa grave."');
+        } else {
+          msg('Prontu\u00e1rio de Jo\u00e3o Ribeiro. Internado em 1953. Paciente Zero.');
+        }
+      } else if (id === 'diarioExperimentos') {
+        if (!state.get('diarioVisto')) {
+          state.set('diarioVisto', true);
+          inv.add('diarioExp', '\ud83d\udcd3', 'Di\u00e1rio: Composto #9 — 1967');
+          msg('Di\u00e1rio de experimentos do Dr. Moretti, capa de couro gasta. Entrada de 1967: "O Composto #9 foi sintetizado com sucesso. Os efeitos nos pacientes s\u00e3o... extraordin\u00e1rios. Documentaremos tudo."');
+        } else {
+          msg('Di\u00e1rio de experimentos: "Composto #9 sintetizado em 1967."');
+        }
+      } else if (id === 'painelCronologico') {
+        abrirPainelCronologico();
+      } else if (id === 'disjuntor') {
+        if (state.get('painelResolvido') && !state.get('energiaRestaurada')) {
+          state.set('energiaRestaurada', true);
+          UITabs.unlock('tabs', 'porao');
+          msg('\u2705 O disjuntor reage! Um zumbido percorre o pr\u00e9dio. Luzes piscam nos corredores. O por\u00e3o agora est\u00e1 acess\u00edvel.');
+        } else if (state.get('energiaRestaurada')) {
+          msg('Disjuntor ativo. Energia fluindo para o pr\u00e9dio.');
+        } else {
+          msg('Disjuntor desativado. O painel mostra "VERIFICA\u00c7\u00c3O DE SEQU\u00caNCIA NECESS\u00c1RIA". Talvez o painel cronol\u00f3gico tenha a resposta.');
+        }
+      } else if (id === 'armarioMedicamentos') {
+        if (!state.get('armarioVisto')) {
+          state.set('armarioVisto', true);
+          inv.add('frasco', '\ud83e\uddea', 'Frascos do Composto #9 (vazios)');
+          msg('Arm\u00e1rio de medicamentos saqueado. Frascos vazios rotulados "Composto #9 — Uso Experimental". Algu\u00e9m levou tudo \u00e0s pressas.');
+        } else {
+          msg('Arm\u00e1rio vazio. Apenas frascos quebrados e poeira.');
+        }
+      } else if (id === 'portaRecepcao') {
+        EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+          state.setAmbiente('recepcao');
+          UITabs.setActive('tabs', 'recepcao');
+          msg('De volta \u00e0 recep\u00e7\u00e3o do sanat\u00f3rio.');
+        });
+      } else if (id === 'portaPorao') {
+        if (state.get('energiaRestaurada')) {
+          EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
+            state.setAmbiente('porao');
+            state.set('poraoVisitado', true);
+            UITabs.setActive('tabs', 'porao');
+            msg('O por\u00e3o. Escuro, abafado. Canos gotejam. O gerador est\u00e1 silencioso. H\u00e1 uma porta marcada DIRETORIA.');
+          });
+        } else {
+          msg('Porta trancada. Sem energia el\u00e9trica, o mecanismo n\u00e3o libera.');
         }
       }
 
       // -- PORÃO --
       else if (id === 'gerador') {
         if (state.get('geradorLigado')) {
-          msg('Gerador funcionando. Energia restaurada.');
+          msg('Gerador funcionando. Energia restaurada no pr\u00e9dio.');
         } else if (state.get('dieselColetado')) {
           state.set('geradorLigado', true);
           state.set('diretoriaAcessivel', true);
-          msg('O gerador tosse, tosse... e ronca. As luzes do porão acendem. Um zumbido elétrico percorre o prédio. A diretoria agora está acessível.');
+          msg('O gerador tosse, tosse... e ronca! As luzes do por\u00e3o acendem. Um zumbido el\u00e9trico percorre o pr\u00e9dio. A porta da diretoria range e se abre sozinha.');
         } else {
-          msg('Gerador a diesel modelo antigo. Tanque vazio. Precisa de combustível para funcionar.');
+          msg('Gerador a diesel antigo. Tanque vazio. O mostrador pisca "N\u00cdVEL BAIXO". Precisa de combust\u00edvel.');
         }
       } else if (id === 'caixotes') {
         if (!state.get('dieselColetado')) {
           state.set('dieselColetado', true);
-          inv.add('diesel', '⛽', 'Galão de diesel');
-          msg('Caixotes empilhados. Atrás deles, um galão de diesel enferrujado. Ainda tem combustível!');
+          inv.add('diesel', '\u26fd', 'Gal\u00e3o de diesel');
+          msg('Caixotes empilhados marcados "MATERIAL HOSPITALAR". Atr\u00e1s deles: um gal\u00e3o de diesel enferrujado. Ainda tem combust\u00edvel!');
         } else {
-          msg('Atrás dos caixotes só há poeira.');
+          msg('Atr\u00e1s dos caixotes s\u00f3 h\u00e1 poeira e teias de aranha.');
         }
-      } else if (id === 'diretoria') {
-        if (state.get('geradorLigado')) {
-          state.set('diretoriaAcessivel', true);
-          msg('A porta da diretoria range ao abrir. A sala do Dr. Moretti está intacta, como se o tempo tivesse parado.');
-        } else {
-          msg('A porta da diretoria está trancada. Sem energia elétrica, o mecanismo não libera a fechadura.');
-        }
+      } else if (id === 'portaDiretoria') {
+        msg('Porta trancada. Precisa de energia para abrir o mecanismo. O gerador deve ter a resposta.');
       } else if (id === 'mesaDiretoria') {
         if (!state.get('mesaVista')) {
           state.set('mesaVista', true);
-          inv.add('relogio', '🕰️', 'Relógio parado: 19:47');
-          msg('Mesa de carvalho do Dr. Moretti. Papéis espalhados. Um relógio de parede parado marca 19:47. A gaveta lateral está entreaberta.');
-        } else if (!state.get('bilheteVisto')) {
-          state.set('bilheteVisto', true);
-          inv.add('bilhete', '📝', '"Gire o código — o ano que tudo começou"');
-          const podeAbrir = state.get('geradorLigado');
-          if (podeAbrir) {
-            msg('A gaveta destrava com o clique elétrico. Dentro: um bilhete amarelado — "O cofre guarda a chave mestra. Gire o código — o ano que tudo começou."');
-          }
+          inv.add('relogio', '\ud83d\udd70\ufe0f', 'Rel\u00f3gio parado marcando 19:47');
+          msg('Mesa de carvalho maci\u00e7o do Dr. Moretti. Sobre ela, pap\u00e9is, um di\u00e1rio e um rel\u00f3gio de mesa parado em 19:47. A gaveta lateral est\u00e1 fechada.');
         } else {
-          msg('Mesa do Dr. Moretti. Relógio: 19:47. Gaveta vazia.');
+          msg('Mesa do Dr. Moretti. Rel\u00f3gio parado: 19:47.');
+        }
+      } else if (id === 'gavetaDiretoria') {
+        if (!state.get('bilheteLido')) {
+          state.set('bilheteLido', true);
+          inv.add('bilhete', '\ud83d\udcdd', '"O ano que tudo come\u00e7ou"');
+          msg('A gaveta desliza silenciosamente. Dentro: um bilhete escrito \u00e0 m\u00e3o — "O cofre guarda a chave mestra. O c\u00f3digo \u00e9 o ano que tudo come\u00e7ou. — H.M."');
+        } else {
+          msg('Gaveta da mesa, agora vazia.');
+        }
+      } else if (id === 'diarioMoretti') {
+        if (!state.get('diarioMorettiLido')) {
+          state.set('diarioMorettiLido', true);
+          inv.add('diarioMoretti', '\ud83d\udcd6', 'Di\u00e1rio pessoal do Dr. Moretti');
+          msg('O di\u00e1rio pessoal do Dr. Moretti. Entrada final: "O conselho vir\u00e1 amanh\u00e3. Escondi tudo no cofre. Apenas quem souber a origem de tudo poder\u00e1 abri-lo. O ano que tudo come\u00e7ou \u00e9 a chave."');
+        } else {
+          msg('Di\u00e1rio do Dr. Moretti, j\u00e1 lido.');
         }
       } else if (id === 'cofre') {
-        abrirPainelCofre();
+        if (!state.get('cofreAberto')) {
+          abrirPainelCofre();
+        } else {
+          msg('O cofre est\u00e1 aberto. A chave mestra j\u00e1 foi removida.');
+        }
       } else if (id === 'voltar') {
         EscapeTransitions.crossfade(game.getCtx(), 900, 600, 500, () => {
-          state.setAmbiente('recepcao');
-          UITabs.setActive('tabs', 'recepcao');
-          msg('De volta à recepção do sanatório.');
+          state.setAmbiente('enfermaria');
+          UITabs.setActive('tabs', 'enfermaria');
+          msg('De volta \u00e0 enfermaria.');
         });
       }
 
       UIInventory.render('inventory', inv.getAll());
     }
 
-    // ============ PUZZLE DO COFRE ============
-    let painelAberto = false;
+    // ============ PUZZLE 1: PAINEL CRONOLÓGICO ============
+    let painelOpen = false;
+    let selectedOrder = [];
+    const DATES = ['1947', '1953', '1967', '1982']; // Correct chronological order
 
-    function abrirPainelCofre() {
-      if (state.get('cofreAberto')) {
-        msg('O cofre já está aberto. A chave mestra está dentro.');
+    function abrirPainelCronologico() {
+      if (state.get('painelResolvido')) {
+        msg('Painel cronol\u00f3gico j\u00e1 resolvido. Sequ\u00eancia verificada.');
         return;
       }
-      painelAberto = true;
+      painelOpen = true;
+      selectedOrder = [];
+      const shuffled = [...DATES].sort(() => Math.random() - 0.5);
+      const buttons = shuffled.map((d, i) =>
+        `<button id="btnDate${i}" data-date="${d}" style="padding:10px 14px; margin:4px; background:#0e1412; border:1px solid #1a3a2a; color:#b8d4c8; font-family:'Courier New'; font-size:1rem; cursor:pointer; border-radius:4px; min-width:70px;">${d}</button>`
+      ).join('');
+
       const html = `
-        <p style="color:${UITokens.get('colorText')}; margin-bottom:16px;">🔒 Cofre do Dr. Moretti — Código de 4 dígitos</p>
-        <input type="text" id="codigoInput" maxlength="4" placeholder="_ _ _ _"
-          style="background:#0a100e; border:1px solid #1a3a2a; color:#5bbf8a; font-family:'Courier New'; font-size:1.5rem; padding:10px; width:140px; text-align:center; border-radius:4px;">
-        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-          <button id="btnTentar" style="padding:8px 20px; background:#0e1412; border:1px solid #1a3a2a; color:#b8d4c8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Tentar</button>
-          <button id="btnVoltar" style="padding:8px 20px; background:#0e1412; border:1px solid #1a3a2a; color:#b8d4c8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Voltar</button>
+        <p style="color:#b8d4c8; margin-bottom:12px;">\ud83d\udcc5 Registro Cronol\u00f3gico</p>
+        <p style="color:#5bbf8a; font-size:0.85rem; margin-bottom:8px;">Clique nos anos na ordem correta dos acontecimentos:</p>
+        <p id="selectedDisplay" style="color:#8b7a5a; margin-bottom:12px; min-height:1.4em;">_ _ _ _</p>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:8px;">
+          ${buttons}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:12px;">
+          <button id="btnResetCrono" style="padding:6px 16px; background:#0e1412; border:1px solid #1a3a2a; color:#b8d4c8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Reiniciar</button>
+          <button id="btnCloseCrono" style="padding:6px 16px; background:#0e1412; border:1px solid #1a3a2a; color:#b8d4c8; font-family:'Courier New'; cursor:pointer; border-radius:4px;">Fechar</button>
         </div>
       `;
       UIPanel.setContent('puzzle-panel', html);
       UIPanel.show('puzzle-panel');
       setTimeout(() => {
-        document.getElementById('codigoInput').focus();
-        document.getElementById('btnTentar').addEventListener('click', tentarCodigo);
-        document.getElementById('btnVoltar').addEventListener('click', fecharPainel);
-        document.getElementById('codigoInput').addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') tentarCodigo();
+        document.getElementById('btnCloseCrono').addEventListener('click', fecharPainelCrono);
+        document.getElementById('btnResetCrono').addEventListener('click', () => {
+          selectedOrder = [];
+          updateSelectedDisplay();
         });
+        for (let i = 0; i < shuffled.length; i++) {
+          const btn = document.getElementById('btnDate' + i);
+          btn.addEventListener('click', function() {
+            const d = this.getAttribute('data-date');
+            const expected = DATES[selectedOrder.length];
+            if (d === expected) {
+              selectedOrder.push(d);
+              this.style.background = '#1a3a2a';
+              this.style.borderColor = '#5bbf8a';
+              this.style.color = '#5bbf8a';
+              this.disabled = true;
+              this.style.cursor = 'default';
+              updateSelectedDisplay();
+              if (selectedOrder.length === 4) {
+                setTimeout(() => {
+                  state.set('painelResolvido', true);
+                  fecharPainelCrono();
+                  msg('\u2705 Sequ\u00eancia correta! O painel acende em verde. A verifica\u00e7\u00e3o foi aprovada. O disjuntor agora pode ser ativado.');
+                }, 500);
+              }
+            } else {
+              msg('\u274c Ordem incorreta. O painel pisca em vermelho. Tente novamente.');
+              selectedOrder = [];
+              updateSelectedDisplay();
+              for (let j = 0; j < shuffled.length; j++) {
+                const b = document.getElementById('btnDate' + j);
+                b.style.background = '#0e1412';
+                b.style.borderColor = '#1a3a2a';
+                b.style.color = '#b8d4c8';
+                b.disabled = false;
+                b.style.cursor = 'pointer';
+              }
+            }
+          });
+          btn.addEventListener('mouseenter', function() {
+            if (!this.disabled) { this.style.background = '#1a2a1e'; this.style.borderColor = '#5bbf8a'; }
+          });
+          btn.addEventListener('mouseleave', function() {
+            if (!this.disabled) { this.style.background = '#0e1412'; this.style.borderColor = '#1a3a2a'; }
+          });
+        }
+        ['btnResetCrono', 'btnCloseCrono'].forEach(function(id) {
+          var b = document.getElementById(id);
+          if (!b) return;
+          b.addEventListener('mouseenter', function() { this.style.background = '#1a2a1e'; this.style.borderColor = '#5bbf8a'; });
+          b.addEventListener('mouseleave', function() { this.style.background = '#0e1412'; this.style.borderColor = '#1a3a2a'; });
+        });
+        document.addEventListener('keydown', onKeyCrono);
       }, 50);
-      msg('Cofre antigo embutido na parede. Mostrador numérico de 4 dígitos. Gravado: "Moretti — Propriedade Pessoal".');
+    }
+
+    function updateSelectedDisplay() {
+      const el = document.getElementById('selectedDisplay');
+      if (!el) return;
+      const parts = [];
+      for (let i = 0; i < 4; i++) {
+        parts.push(selectedOrder[i] || '____');
+      }
+      el.textContent = parts.join('  ');
+    }
+
+    function onKeyCrono(e) {
+      if (e.key === 'Escape') { fecharPainelCrono(); }
+    }
+
+    function fecharPainelCrono() {
+      painelOpen = false;
+      UIPanel.hide('puzzle-panel');
+      document.removeEventListener('keydown', onKeyCrono);
+      msg('Voc\u00ea se afasta do painel cronol\u00f3gico.');
+    }
+
+    // ============ PUZZLE 2: COFRE (1947) ============
+    let cofreOpen = false;
+
+    function abrirPainelCofre() {
+      if (state.get('cofreAberto')) return;
+      cofreOpen = true;
+      const html = `
+        <p style="color:#b8d4c8; margin-bottom:14px;">\ud83d\udd12 Cofre do Dr. Moretti — C\u00f3digo de 4 d\u00edgitos</p>
+        <input type="number" id="codigoInput" min="0" max="9999" inputmode="numeric" pattern="[0-9]{4}" placeholder="_ _ _ _"
+          style="background:#0a100e; border:1px solid #1a3a2a; color:#5bbf8a; font-family:'Courier New'; font-size:1.5rem; padding:10px; width:140px; text-align:center; border-radius:4px; -moz-appearance:textfield; appearance:textfield;"
+          onkeydown="if(event.key==='Enter')document.getElementById('btnTentar').click()">
+        <style>#codigoInput::-webkit-inner-spin-button,#codigoInput::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}</style>
+        <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
+          <button id="btnTentar" style="padding:8px 20px; background:#0e1412; border:1px solid #1a3a2a; color:#b8d4c8; font-family:'Courier New'; cursor:pointer; border-radius:4px;"
+            onmouseenter="this.style.background='#1a2a1e';this.style.borderColor='#5bbf8a'"
+            onmouseleave="this.style.background='#0e1412';this.style.borderColor='#1a3a2a'">Tentar</button>
+          <button id="btnVoltarCofre" style="padding:8px 20px; background:#0e1412; border:1px solid #1a3a2a; color:#b8d4c8; font-family:'Courier New'; cursor:pointer; border-radius:4px;"
+            onmouseenter="this.style.background='#1a2a1e';this.style.borderColor='#5bbf8a'"
+            onmouseleave="this.style.background='#0e1412';this.style.borderColor='#1a3a2a'">Voltar</button>
+        </div>
+      `;
+      UIPanel.setContent('puzzle-panel', html);
+      UIPanel.show('puzzle-panel');
+      setTimeout(() => {
+        const inp = document.getElementById('codigoInput');
+        if (inp) inp.focus();
+        document.getElementById('btnTentar').addEventListener('click', tentarCodigo);
+        document.getElementById('btnVoltarCofre').addEventListener('click', fecharPainelCofre);
+        document.addEventListener('keydown', onKeyCofre);
+      }, 50);
+      msg('Cofre antigo embutido na parede. Mostrador num\u00e9rico de 4 d\u00edgitos. Gravado: "Moretti — Propriedade Pessoal".');
     }
 
     function tentarCodigo() {
       const input = document.getElementById('codigoInput');
       if (!input) return;
       const valor = input.value.trim();
+      if (isNaN(valor) || valor.length !== 4) {
+        msg('\u274c Digite exatamente 4 d\u00edgitos num\u00e9ricos.');
+        return;
+      }
       if (valor === '1947') {
         state.set('cofreAberto', true);
-        painelAberto = false;
+        cofreOpen = false;
         UIPanel.hide('puzzle-panel');
-        inv.add('chaveMestra', '🗝️', 'Chave mestra');
+        document.removeEventListener('keydown', onKeyCofre);
+        inv.add('chaveMestra', '\ud83d\uddfd\ufe0f', 'Chave mestra');
         UIInventory.render('inventory', inv.getAll());
-        msg('✅ O cofre abre com um clique seco! Dentro: uma chave mestra de ferro. Agora você pode abrir a porta principal.');
+        msg('\u2705 O cofre abre com um clique seco! Dentro: uma chave mestra de ferro. Agora voc\u00ea pode abrir a porta principal.');
       } else {
-        msg('❌ Código incorreto. O mecanismo range, mas não cede.');
-        input.value = '';
+        msg('\u274c C\u00f3digo incorreto. O mecanismo range, mas n\u00e3o cede.');
+        input.select();
         input.focus();
       }
     }
 
-    function fecharPainel() {
-      painelAberto = false;
+    function onKeyCofre(e) {
+      if (e.key === 'Escape') { fecharPainelCofre(); }
+    }
+
+    function fecharPainelCofre() {
+      cofreOpen = false;
       UIPanel.hide('puzzle-panel');
-      msg('Você se afasta do cofre.');
+      document.removeEventListener('keydown', onKeyCofre);
+      msg('Voc\u00ea se afasta do cofre.');
     }
 
     // ============ ESCAPE ============
     function escapar() {
+      state.set('escapou', true);
       timer.stop();
       const tempoSeg = Math.floor(timer.getElapsed() / 1000);
       if (EscapeAPI.isLoggedIn()) {
-        EscapeAPI.registrarResultado('Sala 17 — O Sanatório Abandonado', 'win', tempoSeg);
+        EscapeAPI.registrarResultado('Sala 17 — O Sanat\u00f3rio Santa Clara', 'win', tempoSeg);
       }
       UISuccessOverlay.show('success-overlay', {
-        title: '🏥 VOCÊ ESCAPOU!',
-        subtitle: 'As provas dos experimentos de Santa Clara estão seguras. O documentário de Daniel Nunes vai expor a verdade.',
+        title: '\ud83c\udfe5 VOC\u00ca ESCAPOU!',
+        subtitle: 'As provas dos experimentos de Santa Clara est\u00e3o seguras. O document\u00e1rio de Daniel Nunes vai expor a verdade.',
         time: timer.format(),
         links: [
-          { text: '← Voltar ao Lobby', href: '../index.html' }
+          { text: '\u2190 Voltar ao Lobby', href: '../index.html' }
         ]
       });
     }
 
     // ============ INPUT ============
     input.onClick((x, y) => {
-      if (painelAberto) return;
+      if (painelOpen || cofreOpen) return;
       if (EscapeTransitions.isTransitioning()) return;
       const obj = input.hitTest(x, y, getObjetos());
       if (obj) interagir(obj);
     });
 
+    input.onHover((x, y) => {
+      const hovered = input.hitTest(x, y, getObjetos());
+      game.getCanvas().style.cursor = hovered ? 'pointer' : 'crosshair';
+    });
+
     // ============ RENDER ============
     game.onRender((ctx, dt, size) => {
       const amb = state.getAmbiente();
+      if (amb === 'recepcao') renderRecepcao(ctx, state);
+      else if (amb === 'enfermaria') renderEnfermaria(ctx, state);
+      else renderPorao(ctx, state);
 
-      if (amb === 'recepcao') {
-        renderRecepcao(ctx, state);
-      } else {
-        renderPorão(ctx, state);
-      }
-
-      const hovered = input.getHoveredObject(getObjetos());
-      const objs = getObjetos();
-      for (const obj of objs) {
-        ctx.save();
-        if (hovered && hovered.id === obj.id) {
-          ctx.strokeStyle = UITokens.get('glowColor');
-          ctx.lineWidth = 2;
-          ctx.shadowColor = UITokens.get('glowColor');
-          ctx.shadowBlur = 12;
-          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+      if (!EscapeTransitions.isTransitioning() && !painelOpen && !cofreOpen) {
+        const hovered = input.getHoveredObject(getObjetos());
+        const objs = getObjetos();
+        for (const obj of objs) {
+          ctx.save();
+          if (hovered && hovered.id === obj.id) {
+            ctx.strokeStyle = UITokens.get('glowColor');
+            ctx.lineWidth = 2;
+            ctx.shadowColor = UITokens.get('glowColor');
+            ctx.shadowBlur = 12;
+            ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+          }
+          ctx.restore();
         }
-        ctx.restore();
       }
 
       dust.update(dt);
       dust.render(ctx);
-
       EscapeTransitions.render(ctx, size.width, size.height);
     });
 
-    // ============ START ============
     game.start();
     UIInventory.render('inventory', inv.getAll());
+
+    bus.on('inventory:inspect', (item) => {
+      if (item.id === 'anoFundacao') msg('Placa: "Dr. Henrique Moretti — Fundador — 1947".');
+      else if (item.id === 'relatorio') msg('Relat\u00f3rio do Incidente 1994: "C\u00f3digo do cofre = ano de funda\u00e7\u00e3o, 4 d\u00edgitos."');
+      else if (item.id === 'chaveEnfermaria') msg('Chave enferrujada. Etiqueta: "ENFERMARIA — ALA B".');
+      else if (item.id === 'cartaLucia') msg('Carta de L\u00facia Vargas. Denunciou os experimentos em 1982.');
+      else if (item.id === 'prontuario') msg('Prontu\u00e1rio de Jo\u00e3o Ribeiro. Paciente Zero, internado em 1953.');
+      else if (item.id === 'diarioExp') msg('Di\u00e1rio de experimentos. Composto #9 sintetizado em 1967.');
+      else if (item.id === 'diesel') msg('Gal\u00e3o de diesel. Suficiente para ligar o gerador.');
+      else if (item.id === 'relogio') msg('Rel\u00f3gio de mesa do Dr. Moretti. Parado em 19:47.');
+      else if (item.id === 'bilhete') msg('Bilhete: "O c\u00f3digo \u00e9 o ano que tudo come\u00e7ou."');
+      else if (item.id === 'diarioMoretti') msg('Di\u00e1rio do Dr. Moretti: "O ano que tudo come\u00e7ou \u00e9 a chave."');
+      else if (item.id === 'frasco') msg('Frascos vazios do Composto #9. Todos saqueados.');
+      else if (item.id === 'chaveMestra') msg('Chave mestra de ferro. Abre a porta principal do sanat\u00f3rio.');
+    });
   </script>
 </body>
 </html>

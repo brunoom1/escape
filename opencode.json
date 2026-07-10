@@ -2,17 +2,42 @@
   "$schema": "https://opencode.ai/config.json",
   "username": "gabrielmendonca",
   "default_agent": "general",
+  "instructions": ["AGENTS.md"],
   "agent": {
+    "design-grafico": {
+      "description": "Cria assets visuais do jogo para HTML5 Canvas: cenários, objetos, ícones, efeitos e elementos de interface.",
+      "mode": "subagent"
+    },
+    "devops": {
+      "description": "Responsável por versionar, commitar e publicar atualizações do projeto no repositório remoto via Git.",
+      "mode": "subagent"
+    },
     "especialista-ux": {
       "description": "UX/UI specialist for improving user experience and interface design.",
+      "mode": "subagent"
+    },
+    "frontend-canvas": {
+      "description": "Implementa a renderização do jogo usando HTML5 Canvas e JavaScript vanilla, integrando assets, lógica de jogo e interatividade.",
+      "mode": "subagent"
+    },
+    "gerente-projeto": {
+      "description": "Orquestrador da equipe. Coordena todos os agentes, distribui tarefas, coleta entregas e garante que o projeto avança de forma coesa.",
+      "mode": "subagent"
+    },
+    "jogador-profissional": {
+      "description": "Testa o jogo do ponto de vista do jogador final, encontrando bugs, avaliando dificuldade e validando a Regra Anti-Spoiler.",
       "mode": "subagent"
     },
     "roteirista": {
       "description": "Writes and reviews escape room storylines, puzzles, and narrative flow.",
       "mode": "subagent"
     },
+    "spec-designer": {
+      "description": "Transforma ideias em especificações completas e prontas para produção de novas salas de escape, ou inventa conceitos originais.",
+      "mode": "subagent"
+    },
     "webmaster": {
-      "description": "Handles web infrastructure, deployment, and server configuration.",
+      "description": "Cria e mantém o site principal (lobby) do projeto Escape Room com cards imersivos para cada jogo.",
       "mode": "subagent"
     }
   }
